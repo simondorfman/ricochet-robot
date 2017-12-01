@@ -6,7 +6,7 @@ The game can be played by multiple users at the time. The first user that insert
 
 The destination cell of the game and the color change eachtime a group reach it and win the round, otherwise the game maintain the same.
 
-For the Makefaire i have also added all the necessary functionality to move the real robot with the rest api exposed by the arduino yun.
+For the Makefaire i have also add all the necessary functionality to move the real robot with the rest api exposed by the arduino yun.
 ## Screenshot ##
 
 ### WEBPAGE ###
