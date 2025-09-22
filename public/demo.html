@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ricochet Robot Bidding Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2rem; background: #f7f7f7; }
+    h1 { margin-bottom: 0.5rem; }
+    fieldset { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1.5rem; background: #fff; }
+    label { display: block; margin-bottom: 0.5rem; }
+    input, select, button { padding: 0.5rem; font-size: 1rem; }
+    .status { font-size: 1.25rem; margin: 0.5rem 0; }
+    .timer { font-size: 2rem; font-weight: bold; }
+    ul { padding-left: 1.5rem; }
+    .columns { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+    .columns > div { flex: 1 1 250px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    .error { color: #b00020; }
+  </style>
+  <script src="js/polling.js" defer></script>
+</head>
+<body>
+  <h1>Ricochet Robot Bidding Demo</h1>
+  <p>Use this page to experiment with the server-authoritative bidding timer. Join the same room code in two tabs to observe live updates.</p>
+
+  <fieldset>
+    <legend>Join Room</legend>
+    <form id="join-form">
+      <label>
+        Room code
+        <input id="room-code" type="text" required minlength="1" maxlength="12" autocomplete="off">
+      </label>
+      <label>
+        Player ID
+        <input id="player-id" type="number" required min="1" step="1">
+      </label>
+      <label>
+        Polling mode
+        <select id="polling-mode">
+          <option value="adaptive">Adaptive short polling</option>
+          <option value="long">Long polling</option>
+        </select>
+      </label>
+      <button type="submit">Connect</button>
+      <span id="join-error" class="error" aria-live="polite"></span>
+    </form>
+  </fieldset>
+
+  <fieldset>
+    <legend>Current Round</legend>
+    <div class="status">
+      Status: <span id="status">—</span> (state version <span id="state-version">0</span>)
+    </div>
+    <div class="timer">
+      Time Remaining: <span id="remaining">—</span>
+    </div>
+    <div>
+      Lowest Bid: <span id="low-bid">—</span>
+      <span id="low-bidder"></span>
+    </div>
+  </fieldset>
+
+  <div class="columns">
+    <div>
+      <h2>Recent Bids</h2>
+      <ul id="bids"></ul>
+    </div>
+    <div>
+      <h2>Leaderboard</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Points</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <fieldset>
+    <legend>Submit Bid</legend>
+    <form id="bid-form">
+      <label>
+        Bid value
+        <input id="bid-value" type="number" min="1" step="1" required>
+      </label>
+      <button type="submit">Submit Bid</button>
+      <span id="bid-error" class="error" aria-live="polite"></span>
+    </form>
+  </fieldset>
+
+  <script>
+    (function () {
+      const joinForm = document.getElementById('join-form');
+      const bidForm = document.getElementById('bid-form');
+      const roomCodeInput = document.getElementById('room-code');
+      const playerIdInput = document.getElementById('player-id');
+      const pollingModeInput = document.getElementById('polling-mode');
+      const joinError = document.getElementById('join-error');
+      const bidError = document.getElementById('bid-error');
+
+      const statusEl = document.getElementById('status');
+      const versionEl = document.getElementById('state-version');
+      const remainingEl = document.getElementById('remaining');
+      const lowBidEl = document.getElementById('low-bid');
+      const lowBidderEl = document.getElementById('low-bidder');
+      const bidsEl = document.getElementById('bids');
+      const leaderboardEl = document.getElementById('leaderboard');
+
+      let poller = null;
+      let currentRoomCode = null;
+      let currentPlayerId = null;
+      let lastServerRemaining = null;
+      let lastServerTimestamp = null;
+
+      function formatSeconds(seconds) {
+        if (seconds == null) {
+          return '—';
+        }
+        const s = Math.max(0, Math.floor(seconds));
+        const mins = Math.floor(s / 60);
+        const secs = s % 60;
+        return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}`;
+      }
+
+      function renderAll(state) {
+        joinError.textContent = '';
+        statusEl.textContent = state.status;
+        versionEl.textContent = state.stateVersion;
+        remainingEl.textContent = formatSeconds(state.remaining);
+        lowBidEl.textContent = state.currentLow != null ? state.currentLow : '—';
+        lowBidderEl.textContent = state.currentLowBy != null ? `(by ${state.currentLowBy})` : '';
+
+        bidsEl.innerHTML = '';
+        (state.bids || []).forEach(function (bid) {
+          const li = document.createElement('li');
+          const when = bid.createdAt ? new Date(bid.createdAt).toLocaleTimeString() : '—';
+          li.textContent = `Player ${bid.playerId} bid ${bid.value} @ ${when}`;
+          bidsEl.appendChild(li);
+        });
+
+        leaderboardEl.innerHTML = '';
+        (state.leaderboard || []).forEach(function (row) {
+          const tr = document.createElement('tr');
+          const nameCell = document.createElement('td');
+          nameCell.textContent = row.name ? `${row.name} (${row.playerId})` : row.playerId;
+          const pointsCell = document.createElement('td');
+          pointsCell.textContent = row.points != null ? row.points : '0';
+          tr.appendChild(nameCell);
+          tr.appendChild(pointsCell);
+          leaderboardEl.appendChild(tr);
+        });
+
+        lastServerRemaining = state.remaining;
+        lastServerTimestamp = Date.parse(state.serverNow);
+      }
+
+      function estimateRemaining(skewMs) {
+        if (lastServerRemaining == null || lastServerTimestamp == null) {
+          return null;
+        }
+        const serverNow = Date.now() + skewMs;
+        const elapsed = Math.floor((serverNow - lastServerTimestamp) / 1000);
+        return Math.max(0, lastServerRemaining - elapsed);
+      }
+
+      joinForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (!window.PollingHelpers) {
+          joinError.textContent = 'Helpers not loaded yet. Please retry.';
+          return;
+        }
+
+        const code = roomCodeInput.value.trim();
+        const player = Number(playerIdInput.value);
+        const mode = pollingModeInput.value;
+
+        if (!code || !player) {
+          joinError.textContent = 'Enter a room code and player id.';
+          return;
+        }
+
+        currentRoomCode = code;
+        currentPlayerId = player;
+        bidError.textContent = '';
+
+        if (poller && typeof poller.stop === 'function') {
+          poller.stop();
+        }
+
+        lastServerRemaining = null;
+        lastServerTimestamp = null;
+
+        try {
+          if (mode === 'long') {
+            poller = window.PollingHelpers.createLongPoller({
+              code: code,
+              renderAll: renderAll
+            });
+            poller.start();
+          } else {
+            poller = window.PollingHelpers.createAdaptivePoller({
+              code: code,
+              renderAll: renderAll,
+              getRemainingFromUI: estimateRemaining
+            });
+            poller.start().catch(function (err) {
+              console.error(err);
+              joinError.textContent = 'Unable to connect to the room.';
+            });
+          }
+        } catch (err) {
+          console.error(err);
+          joinError.textContent = 'Unable to connect to the room.';
+        }
+      });
+
+      bidForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        bidError.textContent = '';
+
+        if (!currentRoomCode || !currentPlayerId) {
+          bidError.textContent = 'Join a room first.';
+          return;
+        }
+
+        const value = Number(document.getElementById('bid-value').value);
+        if (!Number.isFinite(value) || value <= 0) {
+          bidError.textContent = 'Enter a positive bid value.';
+          return;
+        }
+
+        window.PollingHelpers.submitBid(currentRoomCode, currentPlayerId, value).catch(function (err) {
+          console.error(err);
+          bidError.textContent = 'Bid failed.';
+        });
+      });
+    }());
+  </script>
+</body>
+</html>
