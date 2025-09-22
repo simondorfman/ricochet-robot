@@ -1,0 +1,208 @@
+<?php
+
+declare(strict_types=1);
+
+
+/**
+ * Returns a shared PDO instance using environment variables for configuration.
+ */
+function db(): PDO
+{
+    static $pdo = null;
+
+    if ($pdo instanceof PDO) {
+        return $pdo;
+    }
+
+    $host = getenv('DB_HOST') ?: 'localhost';
+    $dbname = getenv('DB_NAME') ?: 'ricochet_robot';
+    $user = getenv('DB_USER') ?: 'root';
+    $pass = getenv('DB_PASS') ?: '';
+    $charset = 'utf8mb4';
+
+    $dsn = sprintf('mysql:host=%s;dbname=%s;charset=%s', $host, $dbname, $charset);
+
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+
+    $pdo = new PDO($dsn, $user, $pass, $options);
+
+    return $pdo;
+}
+
+function fetchCurrentRoundByRoomCode(string $code): ?array
+{
+    $sql = <<<SQL
+SELECT r.*
+FROM rooms rm
+JOIN rounds r ON r.room_id = rm.id
+WHERE rm.code = :code
+ORDER BY r.id DESC
+LIMIT 1
+SQL;
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['code' => $code]);
+    $round = $stmt->fetch();
+
+    return $round !== false ? $round : null;
+}
+
+function lockRoundForUpdateByRoomCode(string $code): ?array
+{
+    $sql = <<<SQL
+SELECT r.*
+FROM rooms rm
+JOIN rounds r ON r.room_id = rm.id
+WHERE rm.code = :code
+ORDER BY r.id DESC
+LIMIT 1
+FOR UPDATE
+SQL;
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['code' => $code]);
+    $round = $stmt->fetch();
+
+    return $round !== false ? $round : null;
+}
+
+function lockRoundForUpdateById(int $roundId): ?array
+{
+    $sql = 'SELECT * FROM rounds WHERE id = :id FOR UPDATE';
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['id' => $roundId]);
+    $round = $stmt->fetch();
+
+    return $round !== false ? $round : null;
+}
+
+function startCountdown(int $roundId, int $seconds = 60): string
+{
+    $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    $endsAt = $now->modify(sprintf('+%d seconds', $seconds));
+
+    $sql = <<<SQL
+UPDATE rounds
+SET status = 'countdown',
+    bidding_ends_at = :ends_at
+WHERE id = :id
+SQL;
+    $stmt = db()->prepare($sql);
+    $stmt->execute([
+        'id'      => $roundId,
+        'ends_at' => $endsAt->format('Y-m-d H:i:s'),
+    ]);
+
+    return $endsAt->format('Y-m-d H:i:s');
+}
+
+function setRoundStatus(int $roundId, string $status): void
+{
+    $sql = 'UPDATE rounds SET status = :status WHERE id = :id';
+    $stmt = db()->prepare($sql);
+    $stmt->execute([
+        'id'     => $roundId,
+        'status' => $status,
+    ]);
+}
+
+function setNewLowBid(int $roundId, int $playerId, int $value): void
+{
+    $sql = <<<SQL
+UPDATE rounds
+SET current_low_bid = :value,
+    current_low_bidder_player_id = :player_id
+WHERE id = :id
+SQL;
+    $stmt = db()->prepare($sql);
+    $stmt->execute([
+        'id'        => $roundId,
+        'player_id' => $playerId,
+        'value'     => $value,
+    ]);
+}
+
+function insertBid(int $roundId, int $playerId, int $value): void
+{
+    $sql = <<<SQL
+INSERT INTO bids (round_id, player_id, value, created_at)
+VALUES (:round_id, :player_id, :value, UTC_TIMESTAMP())
+SQL;
+    $stmt = db()->prepare($sql);
+    $stmt->execute([
+        'round_id'  => $roundId,
+        'player_id' => $playerId,
+        'value'     => $value,
+    ]);
+}
+
+function bumpVersion(int $roundId): void
+{
+    $sql = 'UPDATE rounds SET state_version = state_version + 1 WHERE id = :id';
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['id' => $roundId]);
+}
+
+function fetchRecentBids(int $roundId): array
+{
+    $sql = <<<SQL
+SELECT player_id, value, created_at
+FROM bids
+WHERE round_id = :round_id
+ORDER BY created_at ASC, id ASC
+SQL;
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['round_id' => $roundId]);
+
+    $rows = $stmt->fetchAll();
+
+    $bids = [];
+    foreach ($rows as $row) {
+        $createdAt = null;
+        if (!empty($row['created_at'])) {
+            try {
+                $createdAt = (new DateTimeImmutable($row['created_at'], new DateTimeZone('UTC')))->format(DateTimeInterface::ATOM);
+            } catch (Exception $e) {
+                $createdAt = null;
+            }
+        }
+
+        $bids[] = [
+            'playerId'  => isset($row['player_id']) ? (int) $row['player_id'] : null,
+            'value'     => isset($row['value']) ? (int) $row['value'] : null,
+            'createdAt' => $createdAt,
+        ];
+    }
+
+    return $bids;
+}
+
+function fetchLeaderboard(int $roomId): array
+{
+    $sql = <<<SQL
+SELECT player_id, name, points
+FROM room_players
+WHERE room_id = :room_id
+ORDER BY points DESC, name ASC
+SQL;
+    try {
+        $stmt = db()->prepare($sql);
+        $stmt->execute(['room_id' => $roomId]);
+        $rows = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+
+    $leaderboard = [];
+    foreach ($rows as $row) {
+        $leaderboard[] = [
+            'playerId' => isset($row['player_id']) ? (int) $row['player_id'] : null,
+            'name'     => $row['name'] ?? null,
+            'points'   => isset($row['points']) ? (int) $row['points'] : 0,
+        ];
+    }
+
+    return $leaderboard;
+}
