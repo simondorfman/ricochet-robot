@@ -1,0 +1,4 @@
+# never commit real secrets
+config.php
+rr-config.php
+.env
