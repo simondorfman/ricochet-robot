@@ -20,6 +20,12 @@
     .error { color: #b00020; }
     .message { margin-left: 1rem; font-size: 0.9rem; color: #333; }
     .message.error { color: #b00020; }
+    .leading-panel { margin-top: 0.75rem; padding: 0.75rem; background: #e9f5ff; border: 1px solid #9cc9f1; border-radius: 4px; }
+    .leading-panel strong { font-weight: 600; }
+    #bids { list-style: none; padding-left: 0; }
+    #bids li { margin-bottom: 0.35rem; padding: 0.35rem 0.5rem; border-radius: 4px; background: #fff; border: 1px solid #eee; }
+    #bids li.bid-tie { border-color: #c5d6f2; background: #f2f6ff; font-weight: 600; }
+    #bids li.bid-leading { border-color: #58a55c; background: #e6f6e6; color: #1f6e25; }
   </style>
   <script src="js/polling.js" defer></script>
 </head>
@@ -65,6 +71,10 @@
     <div>
       Lowest Bid: <span id="low-bid">—</span>
       <span id="low-bidder"></span>
+    </div>
+    <div id="leading-info" class="leading-panel" hidden>
+      <strong>Leading:</strong>
+      <span id="leading-text"></span>
     </div>
   </fieldset>
 
@@ -118,6 +128,8 @@
       const remainingEl = document.getElementById('remaining');
       const lowBidEl = document.getElementById('low-bid');
       const lowBidderEl = document.getElementById('low-bidder');
+      const leadingPanel = document.getElementById('leading-info');
+      const leadingText = document.getElementById('leading-text');
       const bidsEl = document.getElementById('bids');
       const leaderboardEl = document.getElementById('leaderboard');
 
@@ -197,11 +209,30 @@
         lowBidEl.textContent = state.currentLow != null ? state.currentLow : '—';
         lowBidderEl.textContent = state.currentLowBy != null ? `(by ${state.currentLowBy})` : '';
 
+        const currentLow = state.currentLow;
+        const leader = state.currentLeader;
+        const ties = Array.isArray(state.tiesAtCurrentLow) ? state.tiesAtCurrentLow : [];
+        const tieCount = ties.length;
+
         bidsEl.innerHTML = '';
+        let leaderMarked = false;
         (state.bids || []).forEach(function (bid) {
           const li = document.createElement('li');
           const when = bid.createdAt ? new Date(bid.createdAt).toLocaleTimeString() : '—';
-          li.textContent = `Player ${bid.playerId} bid ${bid.value} @ ${when}`;
+          let text = `Player ${bid.playerId} bid ${bid.value} @ ${when}`;
+
+          if (currentLow != null && bid.value === currentLow) {
+            li.classList.add('bid-tie');
+            if (leader && !leaderMarked && leader.playerId === bid.playerId && leader.value === bid.value) {
+              li.classList.add('bid-leading');
+              text += ' (leading)';
+              leaderMarked = true;
+            } else if (tieCount > 1) {
+              text += ' (tied)';
+            }
+          }
+
+          li.textContent = text;
           bidsEl.appendChild(li);
         });
 
@@ -216,6 +247,35 @@
           tr.appendChild(pointsCell);
           leaderboardEl.appendChild(tr);
         });
+
+        if (leader && leader.playerId != null && leader.value != null) {
+          const reason = leader.leaderReason || {};
+          let reasonText = '';
+          if (reason.kind === 'fewer_tokens') {
+            const leaderTokens = Number.isFinite(reason.leaderTokens) ? reason.leaderTokens : leader.tokensWon;
+            const otherTokens = Number.isFinite(reason.otherTokens) ? reason.otherTokens : undefined;
+            const otherPart = otherTokens != null ? ` vs ${otherTokens}` : '';
+            reasonText = `fewer tokens: ${leaderTokens != null ? leaderTokens : '—'}${otherPart}`;
+          } else if (reason.kind === 'earlier_bid') {
+            let timeText = '';
+            if (reason.leaderCreatedAt) {
+              const parsed = Date.parse(reason.leaderCreatedAt);
+              if (!Number.isNaN(parsed)) {
+                timeText = new Date(parsed).toLocaleTimeString();
+              }
+            }
+            reasonText = timeText ? `earlier bid at ${timeText}` : 'earlier bid';
+          } else if (reason.kind === 'new_low') {
+            reasonText = 'new low bid';
+          }
+
+          const baseText = `Player ${leader.playerId} @ ${leader.value}`;
+          leadingText.textContent = reasonText ? `${baseText} (reason: ${reasonText})` : baseText;
+          leadingPanel.hidden = false;
+        } else {
+          leadingPanel.hidden = true;
+          leadingText.textContent = '';
+        }
 
         lastServerRemaining = typeof state.remaining === 'number' ? state.remaining : null;
         const parsedServerNow = state.serverNow ? Date.parse(state.serverNow) : NaN;

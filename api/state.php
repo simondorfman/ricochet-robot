@@ -100,6 +100,149 @@ while (microtime(true) < $timeoutAt) {
             $leaderboard = [];
         }
 
+        $tokensByPlayer = [];
+        foreach ($leaderboard as $entry) {
+            if (!isset($entry['playerId'])) {
+                continue;
+            }
+
+            $tokensByPlayer[(int) $entry['playerId']] = isset($entry['tokensWon']) ? (int) $entry['tokensWon'] : (isset($entry['points']) ? (int) $entry['points'] : 0);
+        }
+
+        $lowestValueBids = [];
+        try {
+            $lowestValueBids = fetchLowestValueBids((int) $round['id']);
+        } catch (Throwable $e) {
+            $lowestValueBids = [];
+        }
+
+        if ($currentLow === null && !empty($lowestValueBids)) {
+            $currentLow = isset($lowestValueBids[0]['value']) ? (int) $lowestValueBids[0]['value'] : null;
+        }
+
+        $tiesAtCurrentLow = [];
+        $currentLeader = null;
+
+        if ($currentLow !== null && !empty($lowestValueBids)) {
+            $tieCandidates = [];
+
+            foreach ($lowestValueBids as $row) {
+                if (!isset($row['playerId']) || $row['playerId'] === null) {
+                    continue;
+                }
+
+                $value = isset($row['value']) ? (int) $row['value'] : null;
+                if ($value === null || $value !== $currentLow) {
+                    continue;
+                }
+
+                $playerId = (int) $row['playerId'];
+                $createdAtIso = $row['createdAt'] ?? null;
+                $createdAtSort = null;
+                if ($createdAtIso !== null) {
+                    try {
+                        $createdAtSort = (new DateTimeImmutable($createdAtIso))->getTimestamp();
+                    } catch (Exception $e) {
+                        $createdAtSort = null;
+                    }
+                }
+
+                $tieCandidates[] = [
+                    'playerId'        => $playerId,
+                    'value'           => $value,
+                    'tokensWon'       => $tokensByPlayer[$playerId] ?? 0,
+                    'createdAt'       => $createdAtIso,
+                    'createdAtSort'   => $createdAtSort,
+                    'firstBidId'      => isset($row['firstBidId']) ? (int) $row['firstBidId'] : null,
+                ];
+            }
+
+            if (!empty($tieCandidates)) {
+                usort($tieCandidates, static function (array $a, array $b): int {
+                    if ($a['value'] !== $b['value']) {
+                        return $a['value'] <=> $b['value'];
+                    }
+
+                    if ($a['tokensWon'] !== $b['tokensWon']) {
+                        return $a['tokensWon'] <=> $b['tokensWon'];
+                    }
+
+                    $aTime = $a['createdAtSort'];
+                    $bTime = $b['createdAtSort'];
+                    if ($aTime !== $bTime) {
+                        if ($aTime === null) {
+                            return 1;
+                        }
+                        if ($bTime === null) {
+                            return -1;
+                        }
+                        return $aTime <=> $bTime;
+                    }
+
+                    $aId = $a['firstBidId'] ?? null;
+                    $bId = $b['firstBidId'] ?? null;
+                    if ($aId !== $bId) {
+                        if ($aId === null) {
+                            return 1;
+                        }
+                        if ($bId === null) {
+                            return -1;
+                        }
+                        return $aId <=> $bId;
+                    }
+
+                    return $a['playerId'] <=> $b['playerId'];
+                });
+
+                $tieCount = count($tieCandidates);
+                $leaderEntry = $tieCandidates[0];
+
+                $leaderReason = [
+                    'kind'            => 'new_low',
+                    'leaderTokens'    => $leaderEntry['tokensWon'],
+                    'tieCountAtValue' => $tieCount,
+                ];
+
+                if ($tieCount > 1) {
+                    $runnerUp = $tieCandidates[1];
+                    if ($leaderEntry['tokensWon'] < $runnerUp['tokensWon']) {
+                        $leaderReason = [
+                            'kind'            => 'fewer_tokens',
+                            'leaderTokens'    => $leaderEntry['tokensWon'],
+                            'otherTokens'     => $runnerUp['tokensWon'],
+                            'tieCountAtValue' => $tieCount,
+                        ];
+                    } else {
+                        $leaderReason = [
+                            'kind'              => 'earlier_bid',
+                            'leaderTokens'      => $leaderEntry['tokensWon'],
+                            'otherTokens'       => $runnerUp['tokensWon'],
+                            'leaderCreatedAt'   => $leaderEntry['createdAt'],
+                            'otherCreatedAt'    => $runnerUp['createdAt'],
+                            'tieCountAtValue'   => $tieCount,
+                        ];
+                    }
+                }
+
+                $currentLeader = [
+                    'playerId'     => $leaderEntry['playerId'],
+                    'value'        => $leaderEntry['value'],
+                    'tokensWon'    => $leaderEntry['tokensWon'],
+                    'createdAt'    => $leaderEntry['createdAt'],
+                    'leaderReason' => $leaderReason,
+                ];
+
+                foreach ($tieCandidates as $candidate) {
+                    $tiesAtCurrentLow[] = [
+                        'playerId'  => $candidate['playerId'],
+                        'value'     => $candidate['value'],
+                        'tokensWon' => $candidate['tokensWon'],
+                        'createdAt' => $candidate['createdAt'],
+                    ];
+                }
+            }
+        }
+
         $payload = [
             'stateVersion' => $currentVersion,
             'status'       => $round['status'],
@@ -110,6 +253,14 @@ while (microtime(true) < $timeoutAt) {
             'leaderboard'  => $leaderboard,
             'serverNow'    => $now->format(DateTimeInterface::ATOM),
         ];
+
+        if ($currentLeader !== null) {
+            $payload['currentLeader'] = $currentLeader;
+        }
+
+        if (!empty($tiesAtCurrentLow)) {
+            $payload['tiesAtCurrentLow'] = $tiesAtCurrentLow;
+        }
 
         respondJson(200, $payload);
     }
