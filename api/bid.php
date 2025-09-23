@@ -65,6 +65,11 @@ try {
     );
 
     $pdo->commit();
+} catch (PlayerAccessException $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    respondJson(422, ['error' => $e->getMessage()]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

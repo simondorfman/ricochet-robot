@@ -17,23 +17,12 @@ if ($code === '') {
 }
 
 $raw = file_get_contents('php://input');
-$hostPlayerName = null;
-
-if ($raw !== false) {
-    $rawTrimmed = trim($raw);
-    if ($rawTrimmed !== '') {
-        $payload = json_decode($rawTrimmed, true);
-        if (!is_array($payload)) {
-            respondJson(400, ['error' => 'Invalid JSON payload.']);
-        }
-
-        if (array_key_exists('hostPlayerName', $payload) && is_string($payload['hostPlayerName'])) {
-            $hostPlayerName = trim($payload['hostPlayerName']);
-            if ($hostPlayerName === '') {
-                $hostPlayerName = null;
-            }
-        }
+if ($raw !== false && trim($raw) !== '') {
+    $payload = json_decode(trim($raw), true);
+    if (!is_array($payload) && $payload !== null) {
+        respondJson(400, ['error' => 'Invalid JSON payload.']);
     }
+    // hostPlayerName support removed; join endpoint now handles host assignment.
 }
 
 $pdo = db();
@@ -56,24 +45,6 @@ try {
     $roundStmt = $pdo->prepare("INSERT INTO rounds (room_id, status, state_version, created_at) VALUES (:room_id, 'bidding', 0, UTC_TIMESTAMP())");
     $roundStmt->execute(['room_id' => $roomId]);
     $roundId = (int) $pdo->lastInsertId();
-
-    if ($hostPlayerName !== null) {
-        $maxPlayerId = (int) min(PHP_INT_MAX, 2147483647);
-        $hostPlayerId = random_int(1, $maxPlayerId);
-
-        $playerStmt = $pdo->prepare('INSERT INTO room_players (room_id, player_id, name, points, tokens_won) VALUES (:room_id, :player_id, :name, 0, 0)');
-        $playerStmt->execute([
-            'room_id'    => $roomId,
-            'player_id'  => $hostPlayerId,
-            'name'       => $hostPlayerName,
-        ]);
-
-        $updateHost = $pdo->prepare('UPDATE rooms SET host_player_id = :player_id WHERE id = :room_id');
-        $updateHost->execute([
-            'player_id' => $hostPlayerId,
-            'room_id'   => $roomId,
-        ]);
-    }
 
     $pdo->commit();
 } catch (PDOException $e) {
