@@ -147,8 +147,12 @@ function tableManager(tableContainer, robotOBJ){
         }
         
         this.updateTabHeight();
-       
-        this.robotOBJ.readJSONRobot(); 
+
+        if (window.layoutRandomizer && typeof window.layoutRandomizer.onBoardReady === "function") {
+            window.layoutRandomizer.onBoardReady();
+        } else {
+            this.robotOBJ.readJSONRobot();
+        }
 
         if(this.divLoad == null){
             var tmp = $("#hiddenTMPDIV").html();
