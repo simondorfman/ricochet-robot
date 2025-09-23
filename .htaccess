@@ -25,11 +25,14 @@ RewriteRule ^api/rooms/([^/]+)/next$ api/next_round.php?code=$1 [QSA,L]
 # POST /api/rooms/{code}/create -> api/create_room.php?code={code}
 RewriteRule ^api/rooms/([^/]+)/create$ api/create_room.php?code=$1 [QSA,L]
 
+# Serve existing files/dirs directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Do not rewrite common static assets
+RewriteCond %{REQUEST_URI} \.(?:css|js|png|jpg|jpeg|svg|gif|ico|map|woff2?)$ [NC]
+RewriteRule ^ - [L]
+
 # Pretty room route /r/{code}
 RewriteRule ^r/([^/]+)/?$ public/demo.html [L]
-
-# --- Local overrides (not tracked) ---
-# Allows per-server secrets without committing them to Git.
-# On DreamHost/Apache 2.4 this is supported; if unavailable, admins can paste
-# their SetEnv line directly into .htaccess as a fallback.
-IncludeOptional .htaccess.local

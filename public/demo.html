@@ -75,6 +75,7 @@
     .color-picker { display: flex; align-items: center; gap: 0.5rem; }
     .color-preview { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 1px solid #d1d5db; background: #f3f4f6; display: inline-block; }
     .banner { margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #facc15; background: #fef3c7; color: #92400e; font-size: 0.95rem; }
+    .join-actions { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     .players-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
     .players-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
     .player-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; }
@@ -113,7 +114,7 @@
       .robot { font-size: 0.85rem; }
     }
   </style>
-  <script src="js/polling.js" defer></script>
+  <script src="/public/js/polling.js" defer></script>
 </head>
 <body>
   <h1>Ricochet Robot Bidding Demo</h1>
@@ -151,6 +152,10 @@
       <button type="submit">Join / Update</button>
       <span id="join-message" class="message" aria-live="polite"></span>
     </form>
+    <div id="join-status" class="banner" hidden aria-live="polite"></div>
+    <div class="join-actions">
+      <button type="button" id="edit-identity" class="secondary" hidden>Change identity</button>
+    </div>
     <div id="color-warning" class="banner" hidden></div>
   </fieldset>
 
@@ -270,9 +275,11 @@
       const colorPreview = document.getElementById('color-preview');
       const colorWarning = document.getElementById('color-warning');
       const joinMessage = document.getElementById('join-message');
+      const joinStatus = document.getElementById('join-status');
       const bidMessage = document.getElementById('bid-message');
       const joinButton = joinForm.querySelector('button[type="submit"]');
       const bidButton = bidForm.querySelector('button[type="submit"]');
+      const editIdentityButton = document.getElementById('edit-identity');
       const bidInput = document.getElementById('bidInput');
       const playersFieldset = document.getElementById('players-fieldset');
       const playersListEl = document.getElementById('players-list');
@@ -284,6 +291,7 @@
       const nextMessage = document.getElementById('next-message');
 
       let storedPlayerInfo = null;
+      let autoJoinContext = null;
       const pathRoomMatch = window.location.pathname.match(/^\/r\/([^/]+)/i);
       const initialRoomCode = pathRoomMatch ? normalizeRoomCode(decodeURIComponent(pathRoomMatch[1])) : '';
       if (initialRoomCode) {
@@ -297,19 +305,51 @@
         storedPlayerInfo = loadStoredPlayer(roomCodeInput.value);
       }
 
+      const globalIdentity = loadGlobalIdentity();
+
       if (storedPlayerInfo) {
-        if (storedPlayerInfo.displayName) {
-          playerNameInput.value = storedPlayerInfo.displayName;
+        const storedNameRaw = storedPlayerInfo.displayName
+          ? storedPlayerInfo.displayName
+          : (globalIdentity && globalIdentity.displayName ? globalIdentity.displayName : '');
+        const storedName = storedNameRaw ? storedNameRaw.trim() : '';
+        if (storedName) {
+          playerNameInput.value = storedName;
         }
         const storedColor = canonicalizeColor(storedPlayerInfo.color);
         if (storedColor) {
           playerColorInput.value = storedColor;
+          if (initialRoomCode && storedName) {
+            autoJoinContext = {
+              code: initialRoomCode,
+              displayName: storedName,
+              color: storedColor
+            };
+          }
         } else {
           showColorWarning('Your previous color is no longer available. Please pick a new one.');
+        }
+      } else if (globalIdentity) {
+        const globalName = globalIdentity.displayName ? globalIdentity.displayName.trim() : '';
+        if (globalName) {
+          playerNameInput.value = globalName;
+        }
+        const globalColor = canonicalizeColor(globalIdentity.color);
+        if (globalColor) {
+          playerColorInput.value = globalColor;
         }
       }
 
       updateColorPreview(playerColorInput.value);
+
+      if (autoJoinContext) {
+        setJoinFormVisible(false);
+        setEditIdentityVisible(false);
+        showJoinStatusBanner(`Rejoining as ${formatIdentityLabel(autoJoinContext.displayName, autoJoinContext.color)}…`);
+      } else {
+        setJoinFormVisible(true);
+        setEditIdentityVisible(false);
+        hideJoinStatusBanner();
+      }
 
       const statusEl = document.getElementById('status');
       const versionEl = document.getElementById('state-version');
@@ -349,6 +389,8 @@
       let countdownTimerId = null;
       let bidAllowed = false;
       let bidInFlight = false;
+      let joinInFlight = false;
+      let autoJoinScheduled = false;
       let lastVerifyingState = null;
       let verifyInFlight = false;
       let nextInFlight = false;
@@ -444,6 +486,97 @@
         } else {
           element.classList.remove('error');
         }
+      }
+
+      function formatIdentityLabel(name, color) {
+        const safeName = typeof name === 'string' ? name.trim() : '';
+        const canonicalColor = canonicalizeColor(color);
+        if (safeName && canonicalColor) {
+          return `${safeName} (${canonicalColor})`;
+        }
+        if (safeName) {
+          return safeName;
+        }
+        if (canonicalColor) {
+          return canonicalColor;
+        }
+        return 'Player';
+      }
+
+      function setJoinFormDisabled(disabled) {
+        if (!joinForm) {
+          return;
+        }
+        const elements = Array.prototype.slice.call(joinForm.elements || []);
+        elements.forEach(function (el) {
+          if (!el || typeof el.disabled !== 'boolean') {
+            return;
+          }
+          el.disabled = disabled;
+        });
+        if (joinButton) {
+          joinButton.disabled = disabled;
+        }
+      }
+
+      function setJoinFormVisible(visible) {
+        if (!joinForm) {
+          return;
+        }
+        joinForm.hidden = !visible;
+        if (visible) {
+          joinForm.removeAttribute('aria-hidden');
+          setJoinFormDisabled(false);
+        } else {
+          joinForm.setAttribute('aria-hidden', 'true');
+          setJoinFormDisabled(true);
+        }
+      }
+
+      function setEditIdentityVisible(visible) {
+        if (!editIdentityButton) {
+          return;
+        }
+        editIdentityButton.hidden = !visible;
+        editIdentityButton.disabled = !visible;
+      }
+
+      function showJoinStatusBanner(text) {
+        if (!joinStatus) {
+          return;
+        }
+        const message = text || '';
+        joinStatus.textContent = message;
+        joinStatus.hidden = message === '';
+      }
+
+      function hideJoinStatusBanner() {
+        showJoinStatusBanner('');
+      }
+
+      function whenPollingHelpersReady(callback, onTimeout) {
+        if (typeof callback !== 'function') {
+          return;
+        }
+        if (window.PollingHelpers) {
+          callback();
+          return;
+        }
+        let attempts = 0;
+        const maxAttempts = 60;
+        const timerId = window.setInterval(function () {
+          attempts += 1;
+          if (window.PollingHelpers) {
+            clearInterval(timerId);
+            callback();
+          } else if (attempts >= maxAttempts) {
+            clearInterval(timerId);
+            console.warn('PollingHelpers did not initialize in time.');
+            if (typeof onTimeout === 'function') {
+              onTimeout();
+            }
+          }
+        }, 100);
       }
 
       function normalizeRoomCode(value) {
@@ -570,6 +703,56 @@
         }
         try {
           window.localStorage.removeItem(key);
+        } catch (err) {
+          // Ignore.
+        }
+      }
+
+      function loadGlobalIdentity() {
+        try {
+          const storedId = window.localStorage.getItem('rr.playerId');
+          const storedName = window.localStorage.getItem('rr.displayName') || '';
+          const storedColor = window.localStorage.getItem('rr.color') || null;
+          const parsedId = storedId != null ? Number.parseInt(storedId, 10) : NaN;
+          if (Number.isFinite(parsedId) && parsedId > 0) {
+            return { playerId: parsedId, displayName: storedName, color: storedColor };
+          }
+          if (storedName || storedColor) {
+            return { playerId: null, displayName: storedName, color: storedColor };
+          }
+        } catch (err) {
+          return null;
+        }
+        return null;
+      }
+
+      function saveGlobalIdentity(playerId, displayName, color) {
+        try {
+          if (playerId != null && Number.isFinite(Number(playerId)) && Number(playerId) > 0) {
+            window.localStorage.setItem('rr.playerId', String(playerId));
+          } else {
+            window.localStorage.removeItem('rr.playerId');
+          }
+          if (typeof displayName === 'string' && displayName) {
+            window.localStorage.setItem('rr.displayName', displayName);
+          } else {
+            window.localStorage.removeItem('rr.displayName');
+          }
+          if (typeof color === 'string' && color) {
+            window.localStorage.setItem('rr.color', color);
+          } else {
+            window.localStorage.removeItem('rr.color');
+          }
+        } catch (err) {
+          // Ignore storage errors.
+        }
+      }
+
+      function clearGlobalIdentity() {
+        try {
+          window.localStorage.removeItem('rr.playerId');
+          window.localStorage.removeItem('rr.displayName');
+          window.localStorage.removeItem('rr.color');
         } catch (err) {
           // Ignore.
         }
@@ -1033,51 +1216,51 @@
         return Math.max(0, lastServerRemaining - elapsed);
       }
 
-      joinForm.addEventListener('submit', function (event) {
-        event.preventDefault();
-        hideColorWarning();
+      function runJoinFlow(code, displayName, selectedColor, options) {
+        const normalizedCode = normalizeRoomCode(code);
+        const sanitizedName = typeof displayName === 'string' ? displayName.trim() : '';
+        const canonicalColor = canonicalizeColor(selectedColor);
+        const auto = Boolean(options && options.auto);
+        const showToastOnSuccess = !(options && options.showToast === false);
 
-        if (!window.PollingHelpers) {
-          setMessage(joinMessage, 'Helpers not loaded yet. Please retry.', true);
+        if (!normalizedCode || !sanitizedName || !canonicalColor) {
+          if (!auto && joinForm && !joinForm.hidden) {
+            setJoinFormDisabled(false);
+          }
           return;
         }
 
-        const code = normalizeRoomCode(roomCodeInput.value);
-        const displayName = playerNameInput.value.trim();
-        const selectedColor = canonicalizeColor(playerColorInput.value);
-
-        if (!code) {
-          setMessage(joinMessage, 'Enter a room code to join.', true);
-          return;
-        }
-        if (!displayName) {
-          setMessage(joinMessage, 'Enter a display name.', true);
-          return;
-        }
-        if (!selectedColor) {
-          showColorWarning('Choose one of the available player colors.');
-          setMessage(joinMessage, 'Pick a valid player color.', true);
+        if (joinInFlight) {
+          if (!auto && joinForm && !joinForm.hidden) {
+            setJoinFormDisabled(false);
+          }
           return;
         }
 
-        setMessage(joinMessage, 'Joining…', false);
-        joinButton.disabled = true;
+        joinInFlight = true;
+
+        if (auto) {
+          setJoinFormVisible(false);
+          setEditIdentityVisible(false);
+          showJoinStatusBanner(`Rejoining as ${formatIdentityLabel(sanitizedName, canonicalColor)}…`);
+        }
 
         (async function connect() {
           const previousRoomCode = currentRoomCode;
 
           try {
-            const result = await joinOrUpdatePlayer(code, displayName, selectedColor);
+            const result = await joinOrUpdatePlayer(normalizedCode, sanitizedName, canonicalColor);
             const joinedPlayerId = Number(result.playerId) || null;
-            const joinedName = result.displayName || displayName;
-            const joinedColor = canonicalizeColor(result.color) || selectedColor;
+            const joinedName = result.displayName || sanitizedName;
+            const joinedColor = canonicalizeColor(result.color) || canonicalColor;
             const joinedTokens = Number.isFinite(result.tokensWon) ? Number(result.tokensWon) : null;
 
-            currentRoomCode = code;
+            currentRoomCode = normalizedCode;
             currentPlayerId = joinedPlayerId;
             currentPlayerName = joinedName;
             currentPlayerColor = joinedColor;
-            saveStoredPlayer(code, currentPlayerId, currentPlayerName, currentPlayerColor);
+            saveStoredPlayer(normalizedCode, currentPlayerId, currentPlayerName, currentPlayerColor);
+            saveGlobalIdentity(currentPlayerId, currentPlayerName, currentPlayerColor);
             storedPlayerInfo = { playerId: currentPlayerId, displayName: currentPlayerName, color: currentPlayerColor };
             updateColorPreview(currentPlayerColor);
             setMessage(bidMessage, '', false);
@@ -1118,25 +1301,109 @@
               });
             }
 
+            const identityLabel = formatIdentityLabel(currentPlayerName, currentPlayerColor);
+            showJoinStatusBanner(`Joined as ${identityLabel}.`);
+            setMessage(joinMessage, '', false);
+            setJoinFormVisible(false);
+            setEditIdentityVisible(true);
+            if (showToastOnSuccess) {
+              showToast(`Joined as ${identityLabel}`, false);
+            }
             const startResult = poller.start();
             if (startResult && typeof startResult.then === 'function') {
               await startResult;
             }
-
-            const joinVerb = switchingRooms ? 'Joined' : 'Updated profile in';
-            setMessage(joinMessage, `${joinVerb} room ${currentRoomCode} as ${currentPlayerName}.`, false);
           } catch (err) {
             console.error(err);
             const message = err && err.message ? err.message : 'Unable to join the room.';
+            if (auto) {
+              setJoinFormVisible(true);
+            }
+            setEditIdentityVisible(false);
+            hideJoinStatusBanner();
             setMessage(joinMessage, message, true);
+            showToast(message, true);
             if (err && err.status === 404) {
-              clearStoredPlayer(code);
+              clearStoredPlayer(normalizedCode);
             }
           } finally {
-            joinButton.disabled = false;
+            if (!auto && joinForm && !joinForm.hidden) {
+              setJoinFormDisabled(false);
+            }
+            joinInFlight = false;
           }
         }());
+      }
+
+      joinForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        hideColorWarning();
+
+        if (!window.PollingHelpers) {
+          setMessage(joinMessage, 'Helpers not loaded yet. Please retry.', true);
+          return;
+        }
+
+        const code = normalizeRoomCode(roomCodeInput.value);
+        const displayName = playerNameInput.value.trim();
+        const selectedColor = canonicalizeColor(playerColorInput.value);
+
+        if (!code) {
+          setMessage(joinMessage, 'Enter a room code to join.', true);
+          return;
+        }
+        if (!displayName) {
+          setMessage(joinMessage, 'Enter a display name.', true);
+          return;
+        }
+        if (!selectedColor) {
+          showColorWarning('Choose one of the available player colors.');
+          setMessage(joinMessage, 'Pick a valid player color.', true);
+          return;
+        }
+
+        playerNameInput.value = displayName;
+        setMessage(joinMessage, 'Joining…', false);
+        setJoinFormDisabled(true);
+        runJoinFlow(code, displayName, selectedColor, { auto: false });
       });
+
+      if (editIdentityButton) {
+        editIdentityButton.addEventListener('click', function () {
+          if (joinInFlight) {
+            return;
+          }
+          setJoinFormVisible(true);
+          setEditIdentityVisible(false);
+          hideJoinStatusBanner();
+          setMessage(joinMessage, '', false);
+          hideColorWarning();
+          if (playerNameInput) {
+            playerNameInput.focus({ preventScroll: true });
+          }
+        });
+      }
+
+      if (autoJoinContext && !autoJoinScheduled) {
+        autoJoinScheduled = true;
+        whenPollingHelpersReady(function () {
+          const autoName = typeof autoJoinContext.displayName === 'string'
+            ? autoJoinContext.displayName.trim()
+            : '';
+          const autoColor = canonicalizeColor(autoJoinContext.color);
+          if (!autoName || !autoColor) {
+            setJoinFormVisible(true);
+            setEditIdentityVisible(false);
+            hideJoinStatusBanner();
+            return;
+          }
+          runJoinFlow(autoJoinContext.code, autoName, autoColor, { auto: true });
+        }, function () {
+          setJoinFormVisible(true);
+          setEditIdentityVisible(false);
+          hideJoinStatusBanner();
+        });
+      }
 
       bidForm.addEventListener('submit', function (event) {
         event.preventDefault();
