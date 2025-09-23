@@ -215,3 +215,12 @@ LayoutRandomizer.prototype.shuffleArray = function(arr){
         arr[j] = tmp;
     }
 };
+
+function randomizeLayout(){
+    if(window.layoutRandomizer && typeof window.layoutRandomizer.randomizeLayout === "function"){
+        window.layoutRandomizer.randomizeLayout();
+    }
+}
+
+window.randomizeLayout = randomizeLayout;
+

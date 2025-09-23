@@ -91,15 +91,10 @@ $( document ).ready(function() {
     tm   = new timerManager();
     gen  = new generic();
     layoutRandomizer = new LayoutRandomizer(tabM, robM);
+    window.layoutRandomizer = layoutRandomizer;
     robC = new robotComunication();
 
-    jsM.generateBaseJson(tabM); 
-
-    $("#btnRandomize").on("click", function(){
-        if(layoutRandomizer){
-            layoutRandomizer.randomizeLayout();
-        }
-    });
+    jsM.generateBaseJson(tabM);
 
     gen.loadPage(); //azioni da fare quando si carica la pagina
 
