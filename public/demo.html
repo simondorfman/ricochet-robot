@@ -34,6 +34,66 @@
     #verifying-queue li.current { font-weight: 700; color: #a05a00; }
     #verifying-queue li.empty { list-style: none; font-style: italic; color: #555; }
     .verify-buttons { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .board-wrapper { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
+    #board { --cell-count: 16; background: #fff; border: 2px solid #d0d5dd; border-radius: 10px; flex: 1 1 320px; max-width: 480px; padding: 0.5rem; outline: none; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
+    #board:focus-visible { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.35), 0 10px 30px rgba(15, 23, 42, 0.1); }
+    .board.is-focused { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25), 0 10px 30px rgba(15, 23, 42, 0.1); }
+    .board-surface { position: relative; width: 100%; padding-bottom: 100%; }
+    .board-grid, .robot-layer { position: absolute; inset: 0; }
+    .board-grid { display: grid; grid-template-columns: repeat(16, 1fr); grid-template-rows: repeat(16, 1fr); }
+    .board-cell { border: 1px solid #d1d5db; background: #fdfdfd; position: relative; }
+    .board-cell.wall-top { border-top-width: 4px; border-top-color: #1f2937; }
+    .board-cell.wall-bottom { border-bottom-width: 4px; border-bottom-color: #1f2937; }
+    .board-cell.wall-left { border-left-width: 4px; border-left-color: #1f2937; }
+    .board-cell.wall-right { border-right-width: 4px; border-right-color: #1f2937; }
+    .board-cell.is-selected::after { content: ''; position: absolute; inset: 3px; border-radius: 6px; border: 2px solid rgba(59, 130, 246, 0.8); pointer-events: none; }
+    .robot-layer { pointer-events: none; }
+    .robot { pointer-events: auto; position: absolute; width: calc(100% / var(--cell-count) - 6px); height: calc(100% / var(--cell-count) - 6px); transform: translate(calc(var(--col) * 100% / var(--cell-count) + 3px), calc(var(--row) * 100% / var(--cell-count) + 3px)); transition: transform 160ms ease; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2); user-select: none; }
+    .robot-label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .robot-blue { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+    .robot-green { background: linear-gradient(135deg, #16a34a, #0f7a37); }
+    .robot-red { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+    .robot-yellow { background: linear-gradient(135deg, #f59e0b, #d97706); color: #1f2937; }
+    .robot.is-selected { box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(59, 130, 246, 0.65); }
+    .board-sidebar { flex: 1 1 220px; max-width: 320px; display: flex; flex-direction: column; gap: 1rem; }
+    .board-selection { font-weight: 600; font-size: 1rem; }
+    .robot-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .robot-badge { border-radius: 999px; padding: 0.4rem 0.9rem; border: 1px solid #d1d5db; background: #fff; font-weight: 600; cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
+    .robot-badge:hover, .robot-badge:focus-visible { transform: translateY(-1px); box-shadow: 0 6px 12px rgba(59, 130, 246, 0.2); outline: none; }
+    .robot-badge-blue { color: #1d4ed8; }
+    .robot-badge-green { color: #0f7a37; }
+    .robot-badge-red { color: #b91c1c; }
+    .robot-badge-yellow { color: #b45309; }
+    .robot-badge.is-selected { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4); }
+    .arrow-controls { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 0.35rem; justify-content: flex-start; justify-items: center; align-items: center; }
+    .arrow-button { border: 1px solid #d1d5db; background: #fff; border-radius: 12px; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
+    .arrow-button:hover, .arrow-button:focus-visible { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25); outline: none; }
+    .arrow-button.arrow-up { grid-column: 2; grid-row: 1; }
+    .arrow-button.arrow-left { grid-column: 1; grid-row: 2; }
+    .arrow-button.arrow-right { grid-column: 3; grid-row: 2; }
+    .arrow-button.arrow-down { grid-column: 2; grid-row: 3; }
+    .board-help { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.95rem; }
+    .board-help summary { font-weight: 600; cursor: pointer; list-style: none; }
+    .board-help summary::-webkit-details-marker { display: none; }
+    .board-help summary::after { content: '⌄'; float: right; transform: rotate(0deg); transition: transform 120ms ease; }
+    .board-help[open] summary::after { transform: rotate(180deg); }
+    .board-help ul { margin: 0.75rem 0 0; padding-left: 1.25rem; }
+    .board-help li { margin-bottom: 0.35rem; }
+    .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(16px); background: #111827; color: #fff; padding: 0.75rem 1.25rem; border-radius: 999px; box-shadow: 0 16px 32px rgba(15, 23, 42, 0.2); opacity: 0; pointer-events: none; transition: opacity 150ms ease, transform 150ms ease; z-index: 1000; font-weight: 600; }
+    .toast.toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.toast--error { background: #b91c1c; }
+    .toast.toast--info { background: #2563eb; }
+    @media (max-width: 960px) {
+      body { margin: 1.25rem; }
+      .board-wrapper { flex-direction: column; }
+      #board { flex: 1 1 auto; width: 100%; max-width: none; }
+      .board-sidebar { width: 100%; max-width: none; }
+    }
+    @media (max-width: 540px) {
+      .arrow-controls { grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); }
+      .arrow-button { font-size: 1rem; }
+      .robot { font-size: 0.85rem; }
+    }
   </style>
   <script src="js/polling.js" defer></script>
 </head>
@@ -96,6 +156,37 @@
     </div>
   </fieldset>
 
+  <fieldset>
+    <legend>Board &amp; Controls</legend>
+    <div class="board-wrapper">
+      <div id="board" class="board" tabindex="0" aria-label="Ricochet Robot board">
+        <div class="board-surface">
+          <div id="board-grid" class="board-grid" aria-hidden="true"></div>
+          <div id="robot-layer" class="robot-layer" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="board-sidebar">
+        <div id="board-selection" class="board-selection" aria-live="polite">Selected robot: —</div>
+        <div id="robot-badges" class="robot-badges" role="group" aria-label="Select robot"></div>
+        <div id="arrow-controls" class="arrow-controls" role="group" aria-label="Move robot">
+          <button type="button" class="arrow-button arrow-up" data-dir="UP" aria-label="Move up">↑</button>
+          <button type="button" class="arrow-button arrow-left" data-dir="LEFT" aria-label="Move left">←</button>
+          <button type="button" class="arrow-button arrow-right" data-dir="RIGHT" aria-label="Move right">→</button>
+          <button type="button" class="arrow-button arrow-down" data-dir="DOWN" aria-label="Move down">↓</button>
+        </div>
+        <details class="board-help" open>
+          <summary>Keyboard tips</summary>
+          <ul>
+            <li><strong>Bid:</strong> Type digits, press Enter</li>
+            <li><strong>Select robot:</strong> Tab / Shift+Tab or click a badge</li>
+            <li><strong>Move:</strong> Arrow keys or W/A/S/D</li>
+            <li><strong>Clear bid:</strong> Esc</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+  </fieldset>
+
   <div class="columns">
     <div>
       <h2>Recent Bids</h2>
@@ -120,12 +211,14 @@
     <form id="bid-form">
       <label>
         Bid value
-        <input id="bid-value" type="number" min="1" step="1" required>
+        <input id="bidInput" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
       </label>
       <button type="submit">Submit Bid</button>
       <span id="bid-message" class="message" aria-live="polite"></span>
     </form>
   </fieldset>
+
+  <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
 
   <script>
     (function () {
@@ -139,7 +232,7 @@
       const bidMessage = document.getElementById('bid-message');
       const joinButton = joinForm.querySelector('button[type="submit"]');
       const bidButton = bidForm.querySelector('button[type="submit"]');
-      const bidValueInput = document.getElementById('bid-value');
+      const bidInput = document.getElementById('bidInput');
 
       const statusEl = document.getElementById('status');
       const versionEl = document.getElementById('state-version');
@@ -156,6 +249,13 @@
       const verifyPassButton = document.getElementById('verify-pass');
       const verifyFailButton = document.getElementById('verify-fail');
       const verifyMessage = document.getElementById('verify-message');
+      const boardEl = document.getElementById('board');
+      const boardGridEl = document.getElementById('board-grid');
+      const robotLayerEl = document.getElementById('robot-layer');
+      const robotBadgesEl = document.getElementById('robot-badges');
+      const arrowControlsEl = document.getElementById('arrow-controls');
+      const boardSelectionEl = document.getElementById('board-selection');
+      const toastEl = document.getElementById('toast');
 
       let poller = null;
       let currentRoomCode = null;
@@ -169,6 +269,73 @@
       let bidInFlight = false;
       let lastVerifyingState = null;
       let verifyInFlight = false;
+      const BOARD_SIZE = 16;
+      const ROBOT_ORDER = ['Blue', 'Green', 'Red', 'Yellow'];
+      const ROBOT_META = {
+        Blue: { id: 'blue', robotClass: 'robot-blue', badgeClass: 'robot-badge-blue', shortLabel: 'B' },
+        Green: { id: 'green', robotClass: 'robot-green', badgeClass: 'robot-badge-green', shortLabel: 'G' },
+        Red: { id: 'red', robotClass: 'robot-red', badgeClass: 'robot-badge-red', shortLabel: 'R' },
+        Yellow: { id: 'yellow', robotClass: 'robot-yellow', badgeClass: 'robot-badge-yellow', shortLabel: 'Y' }
+      };
+      const INITIAL_ROBOT_POSITIONS = {
+        Blue: { row: 1, col: 1 },
+        Green: { row: 1, col: 14 },
+        Red: { row: 14, col: 1 },
+        Yellow: { row: 14, col: 14 }
+      };
+      const STATIC_WALL_DATA = {
+        '0,3': [0, 0, 0, 1],
+        '0,9': [0, 0, 0, 1],
+        '1,13': [0, 1, 0, 1],
+        '1,15': [0, 1, 0, 0],
+        '2,5': [0, 1, 0, 1],
+        '3,9': [1, 0, 1, 0],
+        '4,0': [0, 1, 0, 0],
+        '4,2': [1, 0, 0, 1],
+        '4,14': [1, 0, 0, 1],
+        '5,7': [0, 1, 1, 0],
+        '6,1': [1, 0, 1, 0],
+        '6,12': [0, 1, 1, 0],
+        '7,7': [1, 0, 1, 0],
+        '7,8': [1, 0, 0, 1],
+        '8,7': [0, 1, 1, 0],
+        '8,8': [0, 1, 0, 1],
+        '8,12': [1, 0, 1, 0],
+        '9,3': [0, 1, 0, 1],
+        '9,10': [0, 1, 1, 0],
+        '10,0': [0, 1, 0, 0],
+        '10,15': [0, 1, 0, 0],
+        '11,5': [1, 0, 1, 0],
+        '11,9': [0, 1, 0, 1],
+        '12,14': [1, 0, 0, 1],
+        '13,1': [0, 1, 1, 0],
+        '14,6': [1, 0, 0, 1],
+        '14,13': [1, 0, 1, 0],
+        '15,4': [0, 0, 0, 1],
+        '15,10': [0, 0, 0, 1]
+      };
+      const CENTER_CELLS = [[7, 7], [7, 8], [8, 7], [8, 8]];
+      const KEY_TO_DIR = {
+        ArrowUp: 'UP',
+        ArrowDown: 'DOWN',
+        ArrowLeft: 'LEFT',
+        ArrowRight: 'RIGHT',
+        w: 'UP',
+        s: 'DOWN',
+        a: 'LEFT',
+        d: 'RIGHT'
+      };
+      const WALL_RELATIONS = {
+        top: { dr: -1, dc: 0, opposite: 'bottom' },
+        bottom: { dr: 1, dc: 0, opposite: 'top' },
+        left: { dr: 0, dc: -1, opposite: 'right' },
+        right: { dr: 0, dc: 1, opposite: 'left' }
+      };
+      const boardWalls = new Map();
+      const robotState = {};
+      let boardActive = false;
+      let robotIdx = 0;
+      let toastTimeoutId = null;
 
       function setMessage(element, text, isError) {
         if (!element) {
@@ -184,13 +351,44 @@
 
       function updateBidFormState() {
         const inputEnabled = bidAllowed && !bidInFlight;
-        bidValueInput.disabled = !inputEnabled;
+        if (bidInput) {
+          bidInput.disabled = !inputEnabled;
+        }
         bidButton.disabled = !bidAllowed || bidInFlight;
       }
 
       function setBidFormEnabled(enabled) {
         bidAllowed = Boolean(enabled);
         updateBidFormState();
+        if (!bidAllowed && bidInput) {
+          bidInput.blur();
+        }
+        if (bidAllowed && !bidInFlight && bidInput) {
+          window.requestAnimationFrame(function () {
+            if (document.activeElement !== bidInput && !bidInput.disabled) {
+              bidInput.focus({ preventScroll: true });
+            }
+          });
+        }
+      }
+
+      if (bidInput) {
+        bidInput.addEventListener('input', function (event) {
+          const digits = event.target.value.replace(/\D+/g, '').slice(0, 3);
+          if (event.target.value !== digits) {
+            event.target.value = digits;
+          }
+        });
+        bidInput.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            submitBid();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            bidInput.value = '';
+            setMessage(bidMessage, '', false);
+          }
+        });
       }
 
       function getCurrentVerifier() {
@@ -507,35 +705,56 @@
 
       bidForm.addEventListener('submit', function (event) {
         event.preventDefault();
-        setMessage(bidMessage, '', false);
+        submitBid();
+      });
 
+      async function submitBid() {
+        setMessage(bidMessage, '', false);
         if (!currentRoomCode || !currentPlayerId) {
           setMessage(bidMessage, 'Join a room first.', true);
           return;
         }
-
-        const value = Number(bidValueInput.value);
+        if (!bidAllowed) {
+          setMessage(bidMessage, 'Bidding is closed.', true);
+          return;
+        }
+        const rawValue = bidInput ? bidInput.value.trim() : '';
+        if (!rawValue) {
+          setMessage(bidMessage, 'Enter a positive bid value.', true);
+          return;
+        }
+        const value = Number.parseInt(rawValue, 10);
         if (!Number.isFinite(value) || value <= 0) {
           setMessage(bidMessage, 'Enter a positive bid value.', true);
+          return;
+        }
+        if (bidInFlight) {
           return;
         }
 
         bidInFlight = true;
         updateBidFormState();
-        window.PollingHelpers.submitBid(currentRoomCode, currentPlayerId, value).then(function () {
-          bidValueInput.value = '';
-        }).catch(function (err) {
+        try {
+          await window.PollingHelpers.submitBid(currentRoomCode, currentPlayerId, value);
+          if (bidInput) {
+            bidInput.value = '';
+            if (!bidInput.disabled) {
+              bidInput.focus({ preventScroll: true });
+            }
+          }
+        } catch (err) {
           console.error(err);
           const message = err && err.message ? err.message : 'Bid failed.';
           setMessage(bidMessage, message, true);
+          showToast(message, true);
           if (message.toLowerCase().includes('bidding is closed')) {
             setBidFormEnabled(false);
           }
-        }).finally(function () {
+        } finally {
           bidInFlight = false;
           updateBidFormState();
-        });
-      });
+        }
+      }
 
       setBidFormEnabled(false);
       setMessage(verifyMessage, '', false);
@@ -596,6 +815,421 @@
           updateVerifyButtons();
         });
       });
+
+      function showToast(message, isError) {
+        if (!toastEl) {
+          return;
+        }
+        if (toastTimeoutId) {
+          clearTimeout(toastTimeoutId);
+        }
+        toastEl.textContent = message;
+        toastEl.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+        toastEl.classList.remove('toast--error', 'toast--info', 'toast--visible');
+        void toastEl.offsetWidth;
+        toastEl.classList.add(isError ? 'toast--error' : 'toast--info');
+        toastEl.classList.add('toast--visible');
+        toastTimeoutId = window.setTimeout(hideToast, 4000);
+      }
+
+      function hideToast() {
+        if (!toastEl) {
+          return;
+        }
+        toastEl.classList.remove('toast--visible');
+      }
+
+      function ensureCellWall(row, col) {
+        if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
+          return null;
+        }
+        const key = `${row},${col}`;
+        if (!boardWalls.has(key)) {
+          boardWalls.set(key, { top: false, bottom: false, left: false, right: false });
+        }
+        return boardWalls.get(key);
+      }
+
+      function addWall(row, col, side) {
+        const cell = ensureCellWall(row, col);
+        if (!cell) {
+          return;
+        }
+        cell[side] = true;
+        const relation = WALL_RELATIONS[side];
+        if (!relation) {
+          return;
+        }
+        const neighborRow = row + relation.dr;
+        const neighborCol = col + relation.dc;
+        const neighborCell = ensureCellWall(neighborRow, neighborCol);
+        if (neighborCell) {
+          neighborCell[relation.opposite] = true;
+        }
+      }
+
+      function buildWallData() {
+        boardWalls.clear();
+        for (let r = 0; r < BOARD_SIZE; r += 1) {
+          for (let c = 0; c < BOARD_SIZE; c += 1) {
+            ensureCellWall(r, c);
+          }
+        }
+        Object.entries(STATIC_WALL_DATA).forEach(function ([key, arr]) {
+          if (!Array.isArray(arr) || arr.length < 4) {
+            return;
+          }
+          const parts = key.split(',');
+          const row = Number.parseInt(parts[0], 10);
+          const col = Number.parseInt(parts[1], 10);
+          if (!Number.isFinite(row) || !Number.isFinite(col)) {
+            return;
+          }
+          if (arr[0]) {
+            addWall(row, col, 'top');
+          }
+          if (arr[1]) {
+            addWall(row, col, 'bottom');
+          }
+          if (arr[2]) {
+            addWall(row, col, 'left');
+          }
+          if (arr[3]) {
+            addWall(row, col, 'right');
+          }
+        });
+        CENTER_CELLS.forEach(function (pair) {
+          const row = pair[0];
+          const col = pair[1];
+          ['top', 'bottom', 'left', 'right'].forEach(function (side) {
+            addWall(row, col, side);
+          });
+        });
+      }
+
+      function buildBoardGrid() {
+        if (!boardGridEl) {
+          return;
+        }
+        const fragment = document.createDocumentFragment();
+        boardGridEl.innerHTML = '';
+        for (let r = 0; r < BOARD_SIZE; r += 1) {
+          for (let c = 0; c < BOARD_SIZE; c += 1) {
+            const cell = document.createElement('div');
+            cell.className = 'board-cell';
+            cell.dataset.row = String(r);
+            cell.dataset.col = String(c);
+            const cellWalls = boardWalls.get(`${r},${c}`);
+            if (cellWalls) {
+              if (cellWalls.top) {
+                cell.classList.add('wall-top');
+              }
+              if (cellWalls.bottom) {
+                cell.classList.add('wall-bottom');
+              }
+              if (cellWalls.left) {
+                cell.classList.add('wall-left');
+              }
+              if (cellWalls.right) {
+                cell.classList.add('wall-right');
+              }
+            }
+            fragment.appendChild(cell);
+          }
+        }
+        boardGridEl.appendChild(fragment);
+      }
+
+      function initializeRobots() {
+        ROBOT_ORDER.forEach(function (name) {
+          const start = INITIAL_ROBOT_POSITIONS[name] || { row: 0, col: 0 };
+          const clampedRow = Math.max(0, Math.min(BOARD_SIZE - 1, start.row));
+          const clampedCol = Math.max(0, Math.min(BOARD_SIZE - 1, start.col));
+          robotState[name] = { row: clampedRow, col: clampedCol };
+        });
+      }
+
+      function renderRobotBadges() {
+        if (!robotBadgesEl) {
+          return;
+        }
+        robotBadgesEl.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        ROBOT_ORDER.forEach(function (name) {
+          const meta = ROBOT_META[name];
+          if (!meta) {
+            return;
+          }
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `robot-badge ${meta.badgeClass}`;
+          button.dataset.robot = name;
+          button.textContent = name;
+          button.setAttribute('aria-pressed', 'false');
+          button.addEventListener('click', function () {
+            selectRobotByName(name);
+            if (boardEl) {
+              boardEl.focus({ preventScroll: true });
+            }
+          });
+          fragment.appendChild(button);
+        });
+        robotBadgesEl.appendChild(fragment);
+      }
+
+      function renderRobots() {
+        if (!robotLayerEl) {
+          return;
+        }
+        robotLayerEl.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        ROBOT_ORDER.forEach(function (name) {
+          const state = robotState[name];
+          const meta = ROBOT_META[name];
+          if (!state || !meta) {
+            return;
+          }
+          const robotEl = document.createElement('div');
+          robotEl.className = `robot ${meta.robotClass}`;
+          robotEl.dataset.robot = name;
+          robotEl.style.setProperty('--row', String(state.row));
+          robotEl.style.setProperty('--col', String(state.col));
+          robotEl.setAttribute('role', 'img');
+          robotEl.setAttribute('aria-label', `${name} robot at row ${state.row} column ${state.col}`);
+          robotEl.tabIndex = -1;
+          const label = document.createElement('span');
+          label.className = 'robot-label';
+          label.textContent = meta.shortLabel;
+          robotEl.appendChild(label);
+          robotEl.addEventListener('click', function () {
+            selectRobotByName(name);
+            if (boardEl) {
+              boardEl.focus({ preventScroll: true });
+            }
+          });
+          fragment.appendChild(robotEl);
+        });
+        robotLayerEl.appendChild(fragment);
+        updateSelectedRobotStyles();
+      }
+
+      function highlightSelectedCell() {
+        if (!boardGridEl) {
+          return;
+        }
+        boardGridEl.querySelectorAll('.board-cell.is-selected').forEach(function (cell) {
+          cell.classList.remove('is-selected');
+        });
+        const currentName = ROBOT_ORDER[robotIdx];
+        const state = robotState[currentName];
+        if (!state) {
+          return;
+        }
+        const cell = boardGridEl.querySelector(`.board-cell[data-row="${state.row}"][data-col="${state.col}"]`);
+        if (cell) {
+          cell.classList.add('is-selected');
+        }
+      }
+
+      function updateSelectedRobotStyles() {
+        const currentName = ROBOT_ORDER[robotIdx];
+        if (robotBadgesEl) {
+          robotBadgesEl.querySelectorAll('.robot-badge').forEach(function (badge) {
+            const isCurrent = badge.dataset.robot === currentName;
+            badge.classList.toggle('is-selected', isCurrent);
+            badge.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
+          });
+        }
+        if (robotLayerEl) {
+          robotLayerEl.querySelectorAll('.robot').forEach(function (robotEl) {
+            const isCurrent = robotEl.dataset.robot === currentName;
+            robotEl.classList.toggle('is-selected', isCurrent);
+            robotEl.setAttribute('aria-current', isCurrent ? 'true' : 'false');
+          });
+        }
+        if (boardSelectionEl) {
+          if (currentName && robotState[currentName]) {
+            const pos = robotState[currentName];
+            boardSelectionEl.textContent = `Selected robot: ${currentName} (${pos.row}, ${pos.col})`;
+          } else {
+            boardSelectionEl.textContent = 'Selected robot: —';
+          }
+        }
+        highlightSelectedCell();
+      }
+
+      function selectRobotByIndex(index) {
+        if (!ROBOT_ORDER.length) {
+          return;
+        }
+        const normalized = ((index % ROBOT_ORDER.length) + ROBOT_ORDER.length) % ROBOT_ORDER.length;
+        robotIdx = normalized;
+        updateSelectedRobotStyles();
+      }
+
+      function selectRobotByName(name) {
+        const nextIndex = ROBOT_ORDER.indexOf(name);
+        if (nextIndex === -1) {
+          return;
+        }
+        selectRobotByIndex(nextIndex);
+      }
+
+      function isRobotAt(row, col, ignoreName) {
+        return ROBOT_ORDER.some(function (name) {
+          if (name === ignoreName) {
+            return false;
+          }
+          const state = robotState[name];
+          return state && state.row === row && state.col === col;
+        });
+      }
+
+      function hasWall(row, col, side) {
+        if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
+          return true;
+        }
+        const cell = boardWalls.get(`${row},${col}`);
+        return cell ? Boolean(cell[side]) : false;
+      }
+
+      function canMove(row, col, direction) {
+        switch (direction) {
+          case 'UP':
+            return row > 0 && !hasWall(row, col, 'top') && !hasWall(row - 1, col, 'bottom');
+          case 'DOWN':
+            return row < BOARD_SIZE - 1 && !hasWall(row, col, 'bottom') && !hasWall(row + 1, col, 'top');
+          case 'LEFT':
+            return col > 0 && !hasWall(row, col, 'left') && !hasWall(row, col - 1, 'right');
+          case 'RIGHT':
+            return col < BOARD_SIZE - 1 && !hasWall(row, col, 'right') && !hasWall(row, col + 1, 'left');
+          default:
+            return false;
+        }
+      }
+
+      function moveOne(row, col, direction) {
+        switch (direction) {
+          case 'UP':
+            return { row: row - 1, col: col };
+          case 'DOWN':
+            return { row: row + 1, col: col };
+          case 'LEFT':
+            return { row: row, col: col - 1 };
+          case 'RIGHT':
+            return { row: row, col: col + 1 };
+          default:
+            return { row: row, col: col };
+        }
+      }
+
+      function computeSlide(row, col, direction, ignoreName) {
+        let nextRow = row;
+        let nextCol = col;
+        while (canMove(nextRow, nextCol, direction)) {
+          const candidate = moveOne(nextRow, nextCol, direction);
+          if (isRobotAt(candidate.row, candidate.col, ignoreName)) {
+            break;
+          }
+          nextRow = candidate.row;
+          nextCol = candidate.col;
+        }
+        return { row: nextRow, col: nextCol };
+      }
+
+      function slideSelectedRobot(direction) {
+        const currentName = ROBOT_ORDER[robotIdx];
+        const state = robotState[currentName];
+        if (!state) {
+          return;
+        }
+        const next = computeSlide(state.row, state.col, direction, currentName);
+        if (next.row === state.row && next.col === state.col) {
+          return;
+        }
+        state.row = next.row;
+        state.col = next.col;
+        renderRobots();
+      }
+
+      function handleBoardKeydown(event) {
+        if (!boardActive) {
+          return;
+        }
+        if (event.key === 'Escape') {
+          if (boardEl) {
+            boardEl.blur();
+          }
+          return;
+        }
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          const delta = event.shiftKey ? -1 : 1;
+          selectRobotByIndex(robotIdx + delta);
+          return;
+        }
+        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+        const direction = KEY_TO_DIR[key] || KEY_TO_DIR[event.key];
+        if (!direction) {
+          return;
+        }
+        event.preventDefault();
+        slideSelectedRobot(direction);
+      }
+
+      function handleArrowClick(event) {
+        const target = event.target.closest('button[data-dir]');
+        if (!target) {
+          return;
+        }
+        const direction = target.getAttribute('data-dir');
+        if (!direction) {
+          return;
+        }
+        slideSelectedRobot(direction);
+        if (boardEl) {
+          boardEl.focus({ preventScroll: true });
+        }
+      }
+
+      function initBoard() {
+        if (!boardEl || !boardGridEl || !robotLayerEl) {
+          return;
+        }
+        if (boardEl.tabIndex < 0) {
+          boardEl.tabIndex = 0;
+        }
+        boardEl.classList.remove('is-focused');
+        buildWallData();
+        buildBoardGrid();
+        initializeRobots();
+        renderRobotBadges();
+        renderRobots();
+        boardEl.addEventListener('focus', function () {
+          boardActive = true;
+          boardEl.classList.add('is-focused');
+        });
+        boardEl.addEventListener('blur', function () {
+          boardActive = false;
+          boardEl.classList.remove('is-focused');
+        });
+        boardEl.addEventListener('mousedown', function () {
+          boardEl.focus({ preventScroll: true });
+        });
+        boardEl.addEventListener('touchstart', function () {
+          boardEl.focus({ preventScroll: true });
+        }, { passive: true });
+        window.addEventListener('keydown', handleBoardKeydown);
+        if (arrowControlsEl) {
+          arrowControlsEl.addEventListener('click', handleArrowClick);
+        }
+        updateSelectedRobotStyles();
+      }
+
+      initBoard();
+      if (toastEl) {
+        toastEl.addEventListener('click', hideToast);
+      }
 
       async function ensureRoomExists(code, hostName) {
         const payload = hostName ? { hostPlayerName: hostName } : {};
