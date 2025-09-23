@@ -167,9 +167,41 @@
     return data;
   }
 
+  async function sendVerifyAction(code, playerId, action) {
+    const res = await fetch(`/api/rooms/${encodeURIComponent(code)}/verify/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: Number(playerId) })
+    });
+
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (err) {
+      data = null;
+    }
+
+    if (!res.ok) {
+      const message = data && data.error ? data.error : 'Verification update failed';
+      throw new Error(message);
+    }
+
+    return data;
+  }
+
+  function verifyPass(code, playerId) {
+    return sendVerifyAction(code, playerId, 'pass');
+  }
+
+  function verifyFail(code, playerId) {
+    return sendVerifyAction(code, playerId, 'fail');
+  }
+
   global.PollingHelpers = {
     createAdaptivePoller: createAdaptivePoller,
     createLongPoller: createLongPoller,
-    submitBid: submitBid
+    submitBid: submitBid,
+    verifyPass: verifyPass,
+    verifyFail: verifyFail
   };
 }(window));
