@@ -43,13 +43,10 @@ try {
         respondJson(404, ['error' => 'Room not found or no active round. Create one via POST /api/rooms/{code}/create.']);
     }
 
-    $updated = false;
-
     if ($round['status'] === 'bidding' && empty($round['bidding_ends_at'])) {
         $endsAt = startCountdown((int) $round['id']);
         $round['status'] = 'countdown';
         $round['bidding_ends_at'] = $endsAt;
-        $updated = true;
     }
 
     if ($round['status'] !== 'countdown') {
@@ -62,14 +59,10 @@ try {
 
     if ($shouldUpdateLow) {
         setNewLowBid((int) $round['id'], $playerId, $bidValue);
-        $updated = true;
     }
 
     insertBid((int) $round['id'], $playerId, $bidValue);
-
-    if ($updated) {
-        bumpVersion((int) $round['id']);
-    }
+    bumpVersion((int) $round['id']);
 
     $pdo->commit();
 } catch (Throwable $e) {

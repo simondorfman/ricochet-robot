@@ -245,12 +245,73 @@ SQL;
 
     $leaderboard = [];
     foreach ($rows as $row) {
+        $points = isset($row['points']) ? (int) $row['points'] : 0;
         $leaderboard[] = [
-            'playerId' => isset($row['player_id']) ? (int) $row['player_id'] : null,
-            'name'     => $row['name'] ?? null,
-            'points'   => isset($row['points']) ? (int) $row['points'] : 0,
+            'playerId'   => isset($row['player_id']) ? (int) $row['player_id'] : null,
+            'name'       => $row['name'] ?? null,
+            'points'     => $points,
+            'tokensWon'  => $points,
         ];
     }
 
     return $leaderboard;
+}
+
+function fetchLowestValueBids(int $roundId): array
+{
+    $sql = <<<SQL
+SELECT
+    b.player_id,
+    b.value,
+    MIN(b.created_at) AS first_created_at,
+    MIN(b.id) AS first_bid_id
+FROM bids b
+WHERE b.round_id = :round_id
+GROUP BY b.player_id, b.value
+ORDER BY b.value ASC, first_created_at ASC, first_bid_id ASC
+SQL;
+
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['round_id' => $roundId]);
+
+    $rows = $stmt->fetchAll();
+    if (!$rows) {
+        return [];
+    }
+
+    $lowestValue = null;
+    $results = [];
+
+    foreach ($rows as $row) {
+        if (!isset($row['value'])) {
+            continue;
+        }
+
+        $value = (int) $row['value'];
+        if ($lowestValue === null) {
+            $lowestValue = $value;
+        }
+
+        if ($value !== $lowestValue) {
+            break;
+        }
+
+        $createdAt = null;
+        if (!empty($row['first_created_at'])) {
+            try {
+                $createdAt = (new DateTimeImmutable($row['first_created_at'], new DateTimeZone('UTC')))->format(DateTimeInterface::ATOM);
+            } catch (Exception $e) {
+                $createdAt = null;
+            }
+        }
+
+        $results[] = [
+            'playerId'    => isset($row['player_id']) ? (int) $row['player_id'] : null,
+            'value'       => $value,
+            'createdAt'   => $createdAt,
+            'firstBidId'  => isset($row['first_bid_id']) ? (int) $row['first_bid_id'] : null,
+        ];
+    }
+
+    return $results;
 }
