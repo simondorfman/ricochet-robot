@@ -111,6 +111,9 @@ while (microtime(true) < $timeoutAt) {
         $currentLow = array_key_exists('current_low_bid', $round) && $round['current_low_bid'] !== null
             ? (int) $round['current_low_bid']
             : null;
+        if ($currentLow !== null && $currentLow < 2) {
+            $currentLow = null;
+        }
         $currentLowBy = array_key_exists('current_low_bidder_player_id', $round) && $round['current_low_bidder_player_id'] !== null
             ? (int) $round['current_low_bidder_player_id']
             : null;
@@ -180,8 +183,14 @@ while (microtime(true) < $timeoutAt) {
 
                     $details = $bestBidsByPlayer[$playerId] ?? null;
                     $value = isset($entry['value']) ? (int) $entry['value'] : null;
+                    if ($value !== null && $value < 2) {
+                        $value = null;
+                    }
                     if ($value === null && isset($details['value'])) {
                         $value = (int) $details['value'];
+                        if ($value < 2) {
+                            $value = null;
+                        }
                     }
 
                     $storedQueue[] = [

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/lib/bid_logic.php';
+require_once __DIR__ . '/lib/bid_validation.php';
 
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
@@ -17,20 +19,18 @@ if ($raw === false) {
 }
 
 $payload = json_decode($raw, true);
-if (!is_array($payload)) {
-    respondJson(400, ['error' => 'Invalid JSON payload.']);
+if ($payload === null && json_last_error() !== JSON_ERROR_NONE) {
+    respondJson(422, ['error' => 'Invalid JSON payload.']);
 }
 
-if (!array_key_exists('playerId', $payload) || !array_key_exists('value', $payload)) {
-    respondJson(400, ['error' => 'playerId and value are required.']);
+try {
+    $normalized = normalizeBidPayload($payload);
+} catch (BidValidationException $e) {
+    respondJson(422, ['error' => $e->getMessage()]);
 }
 
-$playerId = (int) $payload['playerId'];
-$bidValue = (int) $payload['value'];
-
-if ($playerId <= 0 || $bidValue <= 0) {
-    respondJson(400, ['error' => 'playerId and value must be positive integers.']);
-}
+$playerId = $normalized['playerId'];
+$bidValue = $normalized['value'];
 
 $pdo = db();
 
@@ -54,17 +54,15 @@ try {
         respondJson(409, ['error' => 'Bidding is closed for the current round.']);
     }
 
-    ensureRoomPlayer((int) $round['room_id'], $playerId, null);
-
-    $currentLow = array_key_exists('current_low_bid', $round) ? $round['current_low_bid'] : null;
-    $shouldUpdateLow = $currentLow === null || $bidValue < (int) $currentLow;
-
-    if ($shouldUpdateLow) {
-        setNewLowBid((int) $round['id'], $playerId, $bidValue);
-    }
-
-    insertBid((int) $round['id'], $playerId, $bidValue);
-    bumpVersion((int) $round['id']);
+    processBidForRound(
+        $round,
+        $playerId,
+        $bidValue,
+        'ensureRoomPlayer',
+        'setNewLowBid',
+        'insertBid',
+        'bumpVersion'
+    );
 
     $pdo->commit();
 } catch (Throwable $e) {

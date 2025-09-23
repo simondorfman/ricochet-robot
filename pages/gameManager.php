@@ -434,20 +434,7 @@ class GameManager{
      * @return 0 ok aggiornato correttamente
      */
     function recScore($group, $robot, $move, $numMosse, $time){
-        $fileName = $group.'.csv';
-            
-        if(isset($robot)){
-            $fields = array("$robot","$move");
-        }else{
-            $fields = array("--END--","$time");
-        }
-
-        if( ($roundPath = $this->getRoundPath()) != null){
-            if(file_exists($this->BASE_DIR_ROOT.$roundPath.$fileName) && $numMosse==1) return -2; //group exists
-            return $this->writeOnCSVFile($this->BASE_DIR_ROOT.$roundPath, $fileName, $fields, 'a+');
-        }else{
-            return -1;
-        }
+        throw new RuntimeException('Legacy recScore handler has been removed. Use the API bid endpoint.');
     }
 
     /**
