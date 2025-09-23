@@ -47,7 +47,36 @@ while (microtime(true) < $timeoutAt) {
                     }
 
                     if ($lockedEnds !== null && $now >= $lockedEnds) {
-                        setRoundStatus((int) $locked['id'], 'verifying');
+                        $queueForStorage = [];
+                        try {
+                            $bestBids = fetchBestBidsPerPlayer((int) $locked['id'], (int) $locked['room_id']);
+                            $orderedQueue = buildVerificationQueue($bestBids);
+                            foreach ($orderedQueue as $entry) {
+                                if (!isset($entry['playerId'], $entry['value'])) {
+                                    continue;
+                                }
+
+                                $queueForStorage[] = [
+                                    'playerId' => (int) $entry['playerId'],
+                                    'value'    => (int) $entry['value'],
+                                ];
+                            }
+                        } catch (Throwable $e) {
+                            $queueForStorage = [];
+                        }
+
+                        $queueJson = json_encode($queueForStorage);
+                        if ($queueJson === false) {
+                            $queueJson = '[]';
+                        }
+
+                        $update = $pdo->prepare(
+                            "UPDATE rounds SET status = 'verifying', verifying_queue_json = :queue_json, verifying_current_index = 0 WHERE id = :id"
+                        );
+                        $update->execute([
+                            'queue_json' => $queueJson,
+                            'id'         => (int) $locked['id'],
+                        ]);
                         bumpVersion((int) $locked['id']);
                     }
                 }
@@ -109,138 +138,219 @@ while (microtime(true) < $timeoutAt) {
             $tokensByPlayer[(int) $entry['playerId']] = isset($entry['tokensWon']) ? (int) $entry['tokensWon'] : (isset($entry['points']) ? (int) $entry['points'] : 0);
         }
 
-        $lowestValueBids = [];
+        $bestBids = [];
         try {
-            $lowestValueBids = fetchLowestValueBids((int) $round['id']);
+            $bestBids = fetchBestBidsPerPlayer((int) $round['id'], (int) $round['room_id']);
         } catch (Throwable $e) {
-            $lowestValueBids = [];
+            $bestBids = [];
         }
 
-        if ($currentLow === null && !empty($lowestValueBids)) {
-            $currentLow = isset($lowestValueBids[0]['value']) ? (int) $lowestValueBids[0]['value'] : null;
+        $bestBidsByPlayer = [];
+        foreach ($bestBids as $entry) {
+            if (!isset($entry['playerId'])) {
+                continue;
+            }
+
+            $playerId = (int) $entry['playerId'];
+            $bestBidsByPlayer[$playerId] = $entry;
+            if (!array_key_exists($playerId, $tokensByPlayer)) {
+                $tokensByPlayer[$playerId] = isset($entry['tokensWon']) ? (int) $entry['tokensWon'] : 0;
+            }
+        }
+
+        $storedQueue = [];
+        $storedQueueSeen = [];
+        $verifyingIndex = isset($round['verifying_current_index']) ? (int) $round['verifying_current_index'] : 0;
+        if ($verifyingIndex < 0) {
+            $verifyingIndex = 0;
+        }
+
+        if (!empty($round['verifying_queue_json'])) {
+            $decodedQueue = json_decode((string) $round['verifying_queue_json'], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedQueue)) {
+                foreach ($decodedQueue as $entry) {
+                    if (!is_array($entry) || !array_key_exists('playerId', $entry)) {
+                        continue;
+                    }
+
+                    $playerId = (int) $entry['playerId'];
+                    if ($playerId <= 0) {
+                        continue;
+                    }
+
+                    $details = $bestBidsByPlayer[$playerId] ?? null;
+                    $value = isset($entry['value']) ? (int) $entry['value'] : null;
+                    if ($value === null && isset($details['value'])) {
+                        $value = (int) $details['value'];
+                    }
+
+                    $storedQueue[] = [
+                        'playerId'      => $playerId,
+                        'value'         => $value,
+                        'tokensWon'     => $details['tokensWon'] ?? ($tokensByPlayer[$playerId] ?? 0),
+                        'createdAt'     => $details['createdAt'] ?? null,
+                        'createdAtSort' => $details['createdAtSort'] ?? null,
+                        'firstBidId'    => $details['firstBidId'] ?? null,
+                    ];
+                    $storedQueueSeen[$playerId] = true;
+                }
+            }
+        }
+
+        $orderedQueue = [];
+        if ($round['status'] === 'verifying' && !empty($storedQueue)) {
+            $orderedQueue = $storedQueue;
+            $extras = [];
+            foreach ($bestBids as $entry) {
+                $playerId = $entry['playerId'] ?? null;
+                if ($playerId === null || isset($storedQueueSeen[(int) $playerId])) {
+                    continue;
+                }
+                $extras[] = $entry;
+            }
+
+            if (!empty($extras)) {
+                $orderedQueue = array_merge($orderedQueue, buildVerificationQueue($extras));
+            }
+        } else {
+            $orderedQueue = buildVerificationQueue($bestBids);
         }
 
         $tiesAtCurrentLow = [];
         $currentLeader = null;
 
-        if ($currentLow !== null && !empty($lowestValueBids)) {
-            $tieCandidates = [];
+        $queueCount = count($orderedQueue);
+        $startIndex = 0;
+        if ($round['status'] === 'verifying' && $verifyingIndex > 0) {
+            $startIndex = min($verifyingIndex, $queueCount);
+        }
 
-            foreach ($lowestValueBids as $row) {
-                if (!isset($row['playerId']) || $row['playerId'] === null) {
-                    continue;
+        if ($queueCount > $startIndex) {
+            $firstCandidate = null;
+            for ($i = $startIndex; $i < $queueCount; $i++) {
+                $entry = $orderedQueue[$i];
+                if (isset($entry['playerId'], $entry['value'])) {
+                    $firstCandidate = $entry;
+                    break;
                 }
-
-                $value = isset($row['value']) ? (int) $row['value'] : null;
-                if ($value === null || $value !== $currentLow) {
-                    continue;
-                }
-
-                $playerId = (int) $row['playerId'];
-                $createdAtIso = $row['createdAt'] ?? null;
-                $createdAtSort = null;
-                if ($createdAtIso !== null) {
-                    try {
-                        $createdAtSort = (new DateTimeImmutable($createdAtIso))->getTimestamp();
-                    } catch (Exception $e) {
-                        $createdAtSort = null;
-                    }
-                }
-
-                $tieCandidates[] = [
-                    'playerId'        => $playerId,
-                    'value'           => $value,
-                    'tokensWon'       => $tokensByPlayer[$playerId] ?? 0,
-                    'createdAt'       => $createdAtIso,
-                    'createdAtSort'   => $createdAtSort,
-                    'firstBidId'      => isset($row['firstBidId']) ? (int) $row['firstBidId'] : null,
-                ];
             }
 
-            if (!empty($tieCandidates)) {
-                usort($tieCandidates, static function (array $a, array $b): int {
-                    if ($a['value'] !== $b['value']) {
-                        return $a['value'] <=> $b['value'];
+            if ($firstCandidate !== null) {
+                $minValue = (int) $firstCandidate['value'];
+                $currentLow = $minValue;
+
+                for ($i = $startIndex; $i < $queueCount; $i++) {
+                    $entry = $orderedQueue[$i];
+                    if (!isset($entry['playerId'], $entry['value'])) {
+                        continue;
                     }
 
-                    if ($a['tokensWon'] !== $b['tokensWon']) {
-                        return $a['tokensWon'] <=> $b['tokensWon'];
+                    $value = (int) $entry['value'];
+                    if ($value !== $minValue) {
+                        break;
                     }
 
-                    $aTime = $a['createdAtSort'];
-                    $bTime = $b['createdAtSort'];
-                    if ($aTime !== $bTime) {
-                        if ($aTime === null) {
-                            return 1;
-                        }
-                        if ($bTime === null) {
-                            return -1;
-                        }
-                        return $aTime <=> $bTime;
-                    }
-
-                    $aId = $a['firstBidId'] ?? null;
-                    $bId = $b['firstBidId'] ?? null;
-                    if ($aId !== $bId) {
-                        if ($aId === null) {
-                            return 1;
-                        }
-                        if ($bId === null) {
-                            return -1;
-                        }
-                        return $aId <=> $bId;
-                    }
-
-                    return $a['playerId'] <=> $b['playerId'];
-                });
-
-                $tieCount = count($tieCandidates);
-                $leaderEntry = $tieCandidates[0];
-
-                $leaderReason = [
-                    'kind'            => 'new_low',
-                    'leaderTokens'    => $leaderEntry['tokensWon'],
-                    'tieCountAtValue' => $tieCount,
-                ];
-
-                if ($tieCount > 1) {
-                    $runnerUp = $tieCandidates[1];
-                    if ($leaderEntry['tokensWon'] < $runnerUp['tokensWon']) {
-                        $leaderReason = [
-                            'kind'            => 'fewer_tokens',
-                            'leaderTokens'    => $leaderEntry['tokensWon'],
-                            'otherTokens'     => $runnerUp['tokensWon'],
-                            'tieCountAtValue' => $tieCount,
-                        ];
-                    } else {
-                        $leaderReason = [
-                            'kind'              => 'earlier_bid',
-                            'leaderTokens'      => $leaderEntry['tokensWon'],
-                            'otherTokens'       => $runnerUp['tokensWon'],
-                            'leaderCreatedAt'   => $leaderEntry['createdAt'],
-                            'otherCreatedAt'    => $runnerUp['createdAt'],
-                            'tieCountAtValue'   => $tieCount,
-                        ];
-                    }
-                }
-
-                $currentLeader = [
-                    'playerId'     => $leaderEntry['playerId'],
-                    'value'        => $leaderEntry['value'],
-                    'tokensWon'    => $leaderEntry['tokensWon'],
-                    'createdAt'    => $leaderEntry['createdAt'],
-                    'leaderReason' => $leaderReason,
-                ];
-
-                foreach ($tieCandidates as $candidate) {
+                    $playerId = (int) $entry['playerId'];
+                    $tokensWon = isset($entry['tokensWon']) ? (int) $entry['tokensWon'] : ($tokensByPlayer[$playerId] ?? 0);
                     $tiesAtCurrentLow[] = [
-                        'playerId'  => $candidate['playerId'],
-                        'value'     => $candidate['value'],
-                        'tokensWon' => $candidate['tokensWon'],
-                        'createdAt' => $candidate['createdAt'],
+                        'playerId'  => $playerId,
+                        'value'     => $value,
+                        'tokensWon' => $tokensWon,
+                        'createdAt' => $entry['createdAt'] ?? null,
                     ];
                 }
+
+                if (!empty($tiesAtCurrentLow)) {
+                    $tieCount = count($tiesAtCurrentLow);
+                    $leaderEntry = $tiesAtCurrentLow[0];
+                    $leaderPlayerId = $leaderEntry['playerId'];
+                    $leaderTokens = isset($leaderEntry['tokensWon']) ? (int) $leaderEntry['tokensWon'] : 0;
+                    $leaderDetails = $bestBidsByPlayer[$leaderPlayerId] ?? [];
+                    $leaderCreatedAt = $leaderDetails['createdAt'] ?? ($leaderEntry['createdAt'] ?? null);
+
+                    $leaderReason = [
+                        'kind'            => 'new_low',
+                        'leaderTokens'    => $leaderTokens,
+                        'tieCountAtValue' => $tieCount,
+                    ];
+
+                    if ($tieCount > 1) {
+                        $otherBestTokens = null;
+                        $otherCreatedAt = null;
+                        foreach (array_slice($tiesAtCurrentLow, 1) as $otherEntry) {
+                            if (!isset($otherEntry['tokensWon'])) {
+                                continue;
+                            }
+
+                            $candidateTokens = (int) $otherEntry['tokensWon'];
+                            if ($otherBestTokens === null || $candidateTokens < $otherBestTokens) {
+                                $otherBestTokens = $candidateTokens;
+                                $otherPlayerId = $otherEntry['playerId'] ?? null;
+                                if ($otherPlayerId !== null && isset($bestBidsByPlayer[$otherPlayerId]['createdAt'])) {
+                                    $otherCreatedAt = $bestBidsByPlayer[$otherPlayerId]['createdAt'];
+                                } else {
+                                    $otherCreatedAt = $otherEntry['createdAt'] ?? null;
+                                }
+                            }
+                        }
+
+                        if ($otherBestTokens === null) {
+                            $otherBestTokens = $leaderTokens;
+                        }
+
+                        $leaderReason['otherBestTokens'] = $otherBestTokens;
+
+                        if ($leaderTokens < $otherBestTokens) {
+                            $leaderReason['kind'] = 'fewer_tokens';
+                        } else {
+                            $leaderReason['kind'] = 'earlier_bid';
+                            if ($leaderCreatedAt !== null) {
+                                $leaderReason['leaderCreatedAt'] = $leaderCreatedAt;
+                            }
+                            if ($otherCreatedAt !== null) {
+                                $leaderReason['otherCreatedAt'] = $otherCreatedAt;
+                            }
+                        }
+                    }
+
+                    $currentLeader = [
+                        'playerId'     => $leaderPlayerId,
+                        'value'        => $leaderEntry['value'],
+                        'tokensWon'    => $leaderTokens,
+                        'createdAt'    => $leaderCreatedAt,
+                        'leaderReason' => $leaderReason,
+                    ];
+
+                    $currentLowBy = $leaderPlayerId;
+                }
             }
+        }
+
+        $verifyingPayload = null;
+        if ($round['status'] === 'verifying') {
+            $queueForState = [];
+            foreach ($storedQueue as $entry) {
+                $queueForState[] = [
+                    'playerId'  => $entry['playerId'],
+                    'value'     => $entry['value'],
+                    'tokensWon' => $entry['tokensWon'],
+                    'createdAt' => $entry['createdAt'],
+                ];
+            }
+
+            $queueLength = count($queueForState);
+            $currentIndex = $verifyingIndex;
+            if ($currentIndex < 0) {
+                $currentIndex = 0;
+            }
+            if ($currentIndex > $queueLength) {
+                $currentIndex = $queueLength;
+            }
+
+            $verifyingPayload = [
+                'queue'        => $queueForState,
+                'currentIndex' => $currentIndex,
+            ];
         }
 
         $payload = [
@@ -260,6 +370,10 @@ while (microtime(true) < $timeoutAt) {
 
         if (!empty($tiesAtCurrentLow)) {
             $payload['tiesAtCurrentLow'] = $tiesAtCurrentLow;
+        }
+
+        if ($verifyingPayload !== null) {
+            $payload['verifying'] = $verifyingPayload;
         }
 
         respondJson(200, $payload);

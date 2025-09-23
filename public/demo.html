@@ -26,6 +26,14 @@
     #bids li { margin-bottom: 0.35rem; padding: 0.35rem 0.5rem; border-radius: 4px; background: #fff; border: 1px solid #eee; }
     #bids li.bid-tie { border-color: #c5d6f2; background: #f2f6ff; font-weight: 600; }
     #bids li.bid-leading { border-color: #58a55c; background: #e6f6e6; color: #1f6e25; }
+    .verifying-panel { margin-top: 1rem; padding: 0.75rem; background: #fff4e5; border: 1px solid #f5c48b; border-radius: 4px; }
+    .verifying-panel h3 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+    #verifying-current { font-weight: 600; margin-bottom: 0.5rem; }
+    #verifying-queue { list-style: decimal inside; padding-left: 1rem; margin: 0; }
+    #verifying-queue li { padding: 0.25rem 0; }
+    #verifying-queue li.current { font-weight: 700; color: #a05a00; }
+    #verifying-queue li.empty { list-style: none; font-style: italic; color: #555; }
+    .verify-buttons { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   </style>
   <script src="js/polling.js" defer></script>
 </head>
@@ -76,6 +84,16 @@
       <strong>Leading:</strong>
       <span id="leading-text"></span>
     </div>
+    <div id="verifying-container" class="verifying-panel" hidden>
+      <h3>Verification Queue</h3>
+      <div id="verifying-current">Current: —</div>
+      <ol id="verifying-queue"></ol>
+      <div class="verify-buttons">
+        <button type="button" id="verify-pass">Pass</button>
+        <button type="button" id="verify-fail">Fail</button>
+        <span id="verify-message" class="message" aria-live="polite"></span>
+      </div>
+    </div>
   </fieldset>
 
   <div class="columns">
@@ -89,7 +107,7 @@
         <thead>
           <tr>
             <th>Player</th>
-            <th>Points</th>
+            <th>Tokens</th>
           </tr>
         </thead>
         <tbody id="leaderboard"></tbody>
@@ -132,6 +150,12 @@
       const leadingText = document.getElementById('leading-text');
       const bidsEl = document.getElementById('bids');
       const leaderboardEl = document.getElementById('leaderboard');
+      const verifyingContainer = document.getElementById('verifying-container');
+      const verifyingCurrent = document.getElementById('verifying-current');
+      const verifyingQueueList = document.getElementById('verifying-queue');
+      const verifyPassButton = document.getElementById('verify-pass');
+      const verifyFailButton = document.getElementById('verify-fail');
+      const verifyMessage = document.getElementById('verify-message');
 
       let poller = null;
       let currentRoomCode = null;
@@ -143,6 +167,8 @@
       let countdownTimerId = null;
       let bidAllowed = false;
       let bidInFlight = false;
+      let lastVerifyingState = null;
+      let verifyInFlight = false;
 
       function setMessage(element, text, isError) {
         if (!element) {
@@ -165,6 +191,29 @@
       function setBidFormEnabled(enabled) {
         bidAllowed = Boolean(enabled);
         updateBidFormState();
+      }
+
+      function getCurrentVerifier() {
+        if (!lastVerifyingState || !Array.isArray(lastVerifyingState.queue)) {
+          return null;
+        }
+
+        const index = Number.isInteger(lastVerifyingState.currentIndex)
+          ? lastVerifyingState.currentIndex
+          : 0;
+
+        if (index < 0) {
+          return null;
+        }
+
+        return lastVerifyingState.queue[index] || null;
+      }
+
+      function updateVerifyButtons() {
+        const currentEntry = getCurrentVerifier();
+        const enabled = Boolean(currentRoomCode && currentEntry && !verifyInFlight);
+        verifyPassButton.disabled = !enabled;
+        verifyFailButton.disabled = !enabled;
       }
 
       function stopCountdownTicker() {
@@ -241,19 +290,85 @@
           const tr = document.createElement('tr');
           const nameCell = document.createElement('td');
           nameCell.textContent = row.name ? `${row.name} (${row.playerId})` : row.playerId;
-          const pointsCell = document.createElement('td');
-          pointsCell.textContent = row.points != null ? row.points : '0';
+          const tokensCell = document.createElement('td');
+          let tokensValue = null;
+          if (Number.isFinite(row.tokensWon)) {
+            tokensValue = row.tokensWon;
+          } else if (Number.isFinite(row.points)) {
+            tokensValue = row.points;
+          }
+          tokensCell.textContent = tokensValue != null ? tokensValue : '0';
           tr.appendChild(nameCell);
-          tr.appendChild(pointsCell);
+          tr.appendChild(tokensCell);
           leaderboardEl.appendChild(tr);
         });
+
+        let verifyingState = null;
+        if (state.status === 'verifying' && state.verifying && Array.isArray(state.verifying.queue)) {
+          const queueCopy = state.verifying.queue.map(function (entry) {
+            return {
+              playerId: entry.playerId,
+              value: entry.value,
+              tokensWon: entry.tokensWon,
+              createdAt: entry.createdAt
+            };
+          });
+          const currentIndex = Number.isInteger(state.verifying.currentIndex) ? state.verifying.currentIndex : 0;
+          verifyingState = { queue: queueCopy, currentIndex: currentIndex };
+        }
+
+        lastVerifyingState = verifyingState;
+
+        if (verifyingState) {
+          verifyingContainer.hidden = false;
+          verifyingQueueList.innerHTML = '';
+          const queue = verifyingState.queue;
+          const currentIndex = verifyingState.currentIndex >= 0 ? verifyingState.currentIndex : 0;
+
+          if (queue.length === 0) {
+            const emptyLi = document.createElement('li');
+            emptyLi.textContent = 'No bids awaiting verification.';
+            emptyLi.classList.add('empty');
+            verifyingQueueList.appendChild(emptyLi);
+          } else {
+            queue.forEach(function (entry, index) {
+              const li = document.createElement('li');
+              const valueText = entry.value != null ? entry.value : '—';
+              const tokensText = entry.tokensWon != null ? ` (tokens ${entry.tokensWon})` : '';
+              li.textContent = `Player ${entry.playerId} @ ${valueText}${tokensText}`;
+              if (index === currentIndex) {
+                li.classList.add('current');
+              }
+              verifyingQueueList.appendChild(li);
+            });
+          }
+
+          const currentEntry = getCurrentVerifier();
+          if (currentEntry) {
+            const valueText = currentEntry.value != null ? currentEntry.value : '—';
+            const tokensText = currentEntry.tokensWon != null ? ` (tokens ${currentEntry.tokensWon})` : '';
+            verifyingCurrent.textContent = `Current: Player ${currentEntry.playerId} @ ${valueText}${tokensText}`;
+          } else {
+            verifyingCurrent.textContent = 'Current: —';
+          }
+
+          updateVerifyButtons();
+        } else {
+          verifyingContainer.hidden = true;
+          verifyingQueueList.innerHTML = '';
+          verifyingCurrent.textContent = 'Current: —';
+          lastVerifyingState = null;
+          verifyInFlight = false;
+          updateVerifyButtons();
+          setMessage(verifyMessage, '', false);
+        }
 
         if (leader && leader.playerId != null && leader.value != null) {
           const reason = leader.leaderReason || {};
           let reasonText = '';
           if (reason.kind === 'fewer_tokens') {
             const leaderTokens = Number.isFinite(reason.leaderTokens) ? reason.leaderTokens : leader.tokensWon;
-            const otherTokens = Number.isFinite(reason.otherTokens) ? reason.otherTokens : undefined;
+            const otherTokens = Number.isFinite(reason.otherBestTokens) ? reason.otherBestTokens : undefined;
             const otherPart = otherTokens != null ? ` vs ${otherTokens}` : '';
             reasonText = `fewer tokens: ${leaderTokens != null ? leaderTokens : '—'}${otherPart}`;
           } else if (reason.kind === 'earlier_bid') {
@@ -264,9 +379,13 @@
                 timeText = new Date(parsed).toLocaleTimeString();
               }
             }
-            reasonText = timeText ? `earlier bid at ${timeText}` : 'earlier bid';
+            const leaderTokens = Number.isFinite(reason.leaderTokens) ? reason.leaderTokens : leader.tokensWon;
+            const otherTokens = Number.isFinite(reason.otherBestTokens) ? reason.otherBestTokens : undefined;
+            const tokenPart = leaderTokens != null && otherTokens != null ? ` (tokens ${leaderTokens} vs ${otherTokens})` : '';
+            reasonText = timeText ? `earlier bid at ${timeText}${tokenPart}` : `earlier bid${tokenPart}`;
           } else if (reason.kind === 'new_low') {
-            reasonText = 'new low bid';
+            const leaderTokens = Number.isFinite(reason.leaderTokens) ? reason.leaderTokens : leader.tokensWon;
+            reasonText = leaderTokens != null ? `new low bid (tokens ${leaderTokens})` : 'new low bid';
           }
 
           const baseText = `Player ${leader.playerId} @ ${leader.value}`;
@@ -419,6 +538,64 @@
       });
 
       setBidFormEnabled(false);
+      setMessage(verifyMessage, '', false);
+      updateVerifyButtons();
+
+      verifyPassButton.addEventListener('click', function () {
+        if (!currentRoomCode) {
+          setMessage(verifyMessage, 'Join a room first.', true);
+          return;
+        }
+
+        const currentEntry = getCurrentVerifier();
+        if (!currentEntry) {
+          setMessage(verifyMessage, 'No verifier available.', true);
+          return;
+        }
+
+        verifyInFlight = true;
+        updateVerifyButtons();
+        setMessage(verifyMessage, '', false);
+
+        window.PollingHelpers.verifyPass(currentRoomCode, currentEntry.playerId).then(function () {
+          setMessage(verifyMessage, 'Marked as solved.', false);
+        }).catch(function (err) {
+          console.error(err);
+          const message = err && err.message ? err.message : 'Verification update failed.';
+          setMessage(verifyMessage, message, true);
+        }).finally(function () {
+          verifyInFlight = false;
+          updateVerifyButtons();
+        });
+      });
+
+      verifyFailButton.addEventListener('click', function () {
+        if (!currentRoomCode) {
+          setMessage(verifyMessage, 'Join a room first.', true);
+          return;
+        }
+
+        const currentEntry = getCurrentVerifier();
+        if (!currentEntry) {
+          setMessage(verifyMessage, 'No verifier available.', true);
+          return;
+        }
+
+        verifyInFlight = true;
+        updateVerifyButtons();
+        setMessage(verifyMessage, '', false);
+
+        window.PollingHelpers.verifyFail(currentRoomCode, currentEntry.playerId).then(function () {
+          setMessage(verifyMessage, 'Advanced to next verifier.', false);
+        }).catch(function (err) {
+          console.error(err);
+          const message = err && err.message ? err.message : 'Verification update failed.';
+          setMessage(verifyMessage, message, true);
+        }).finally(function () {
+          verifyInFlight = false;
+          updateVerifyButtons();
+        });
+      });
 
       async function ensureRoomExists(code, hostName) {
         const payload = hostName ? { hostPlayerName: hostName } : {};

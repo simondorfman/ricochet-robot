@@ -61,7 +61,7 @@ try {
         $maxPlayerId = (int) min(PHP_INT_MAX, 2147483647);
         $hostPlayerId = random_int(1, $maxPlayerId);
 
-        $playerStmt = $pdo->prepare('INSERT INTO room_players (room_id, player_id, name, points) VALUES (:room_id, :player_id, :name, 0)');
+        $playerStmt = $pdo->prepare('INSERT INTO room_players (room_id, player_id, name, points, tokens_won) VALUES (:room_id, :player_id, :name, 0, 0)');
         $playerStmt->execute([
             'room_id'    => $roomId,
             'player_id'  => $hostPlayerId,

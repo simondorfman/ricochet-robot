@@ -54,6 +54,8 @@ try {
         respondJson(409, ['error' => 'Bidding is closed for the current round.']);
     }
 
+    ensureRoomPlayer((int) $round['room_id'], $playerId, null);
+
     $currentLow = array_key_exists('current_low_bid', $round) ? $round['current_low_bid'] : null;
     $shouldUpdateLow = $currentLow === null || $bidValue < (int) $currentLow;
 

@@ -186,6 +186,56 @@ SQL;
     ]);
 }
 
+function ensureRoomPlayer(int $roomId, int $playerId, ?string $name = null): void
+{
+    $normalizedName = null;
+    if ($name !== null) {
+        $trimmed = trim($name);
+        if ($trimmed !== '') {
+            $normalizedName = $trimmed;
+        }
+    }
+
+    $sql = <<<SQL
+INSERT INTO room_players (room_id, player_id, name, points, tokens_won, created_at, updated_at)
+VALUES (:room_id, :player_id, :name, 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+ON DUPLICATE KEY UPDATE
+    name = CASE
+        WHEN :name_update IS NULL OR :name_update = '' THEN name
+        WHEN name IS NULL OR name = '' THEN :name_update
+        ELSE name
+    END,
+    updated_at = updated_at
+SQL;
+
+    $stmt = db()->prepare($sql);
+    $stmt->execute([
+        'room_id'     => $roomId,
+        'player_id'   => $playerId,
+        'name'        => $normalizedName,
+        'name_update' => $normalizedName,
+    ]);
+}
+
+function awardTokenToPlayer(int $roomId, int $playerId): void
+{
+    ensureRoomPlayer($roomId, $playerId, null);
+
+    $sql = <<<SQL
+UPDATE room_players
+SET tokens_won = tokens_won + 1,
+    points = points + 1,
+    updated_at = UTC_TIMESTAMP()
+WHERE room_id = :room_id AND player_id = :player_id
+SQL;
+
+    $stmt = db()->prepare($sql);
+    $stmt->execute([
+        'room_id'   => $roomId,
+        'player_id' => $playerId,
+    ]);
+}
+
 function bumpVersion(int $roundId): void
 {
     $sql = 'UPDATE rounds SET state_version = state_version + 1 WHERE id = :id';
@@ -230,10 +280,10 @@ SQL;
 function fetchLeaderboard(int $roomId): array
 {
     $sql = <<<SQL
-SELECT player_id, name, points
+SELECT player_id, name, points, tokens_won
 FROM room_players
 WHERE room_id = :room_id
-ORDER BY points DESC, name ASC
+ORDER BY tokens_won DESC, points DESC, name ASC
 SQL;
     try {
         $stmt = db()->prepare($sql);
@@ -246,48 +296,101 @@ SQL;
     $leaderboard = [];
     foreach ($rows as $row) {
         $points = isset($row['points']) ? (int) $row['points'] : 0;
+        $tokens = isset($row['tokens_won']) ? (int) $row['tokens_won'] : $points;
         $leaderboard[] = [
             'playerId'   => isset($row['player_id']) ? (int) $row['player_id'] : null,
             'name'       => $row['name'] ?? null,
             'points'     => $points,
-            'tokensWon'  => $points,
+            'tokensWon'  => $tokens,
         ];
     }
 
     return $leaderboard;
 }
 
-function fetchLowestValueBids(int $roundId): array
+function fetchBestBidsPerPlayer(int $roundId, int $roomId): array
 {
     $sql = <<<SQL
 SELECT
-    b.player_id,
-    b.value,
+    bp.player_id,
+    bp.best_value,
     MIN(b.created_at) AS first_created_at,
-    MIN(b.id) AS first_bid_id
-FROM bids b
-WHERE b.round_id = :round_id
-GROUP BY b.player_id, b.value
-ORDER BY b.value ASC, first_created_at ASC, first_bid_id ASC
+    MIN(b.id) AS first_bid_id,
+    COALESCE(MAX(rp.tokens_won), 0) AS tokens_won
+FROM (
+    SELECT player_id, MIN(value) AS best_value
+    FROM bids
+    WHERE round_id = :round_id
+    GROUP BY player_id
+) AS bp
+JOIN bids b ON b.round_id = :round_id
+           AND b.player_id = bp.player_id
+           AND b.value = bp.best_value
+LEFT JOIN room_players rp ON rp.room_id = :room_id AND rp.player_id = bp.player_id
+GROUP BY bp.player_id, bp.best_value
+ORDER BY bp.best_value ASC, first_created_at ASC, first_bid_id ASC
 SQL;
 
     $stmt = db()->prepare($sql);
-    $stmt->execute(['round_id' => $roundId]);
+    $stmt->execute([
+        'round_id' => $roundId,
+        'room_id'  => $roomId,
+    ]);
 
     $rows = $stmt->fetchAll();
     if (!$rows) {
         return [];
     }
 
-    $lowestValue = null;
     $results = [];
 
     foreach ($rows as $row) {
-        if (!isset($row['value'])) {
+        if (!isset($row['player_id'], $row['best_value'])) {
             continue;
         }
 
-        $value = (int) $row['value'];
+        $createdAt = null;
+        $createdAtSort = null;
+        if (!empty($row['first_created_at'])) {
+            try {
+                $dt = new DateTimeImmutable($row['first_created_at'], new DateTimeZone('UTC'));
+                $createdAt = $dt->format(DateTimeInterface::ATOM);
+                $createdAtSort = $dt->getTimestamp();
+            } catch (Exception $e) {
+                $createdAt = null;
+                $createdAtSort = null;
+            }
+        }
+
+        $results[] = [
+            'playerId'      => (int) $row['player_id'],
+            'value'         => (int) $row['best_value'],
+            'tokensWon'     => isset($row['tokens_won']) ? (int) $row['tokens_won'] : 0,
+            'createdAt'     => $createdAt,
+            'createdAtSort' => $createdAtSort,
+            'firstBidId'    => isset($row['first_bid_id']) ? (int) $row['first_bid_id'] : null,
+        ];
+    }
+
+    return $results;
+}
+
+function fetchLowestValueBids(int $roundId, int $roomId): array
+{
+    $all = fetchBestBidsPerPlayer($roundId, $roomId);
+    if (empty($all)) {
+        return [];
+    }
+
+    $lowestValue = null;
+    $results = [];
+
+    foreach ($all as $entry) {
+        if (!isset($entry['value'])) {
+            continue;
+        }
+
+        $value = (int) $entry['value'];
         if ($lowestValue === null) {
             $lowestValue = $value;
         }
@@ -296,22 +399,83 @@ SQL;
             break;
         }
 
-        $createdAt = null;
-        if (!empty($row['first_created_at'])) {
-            try {
-                $createdAt = (new DateTimeImmutable($row['first_created_at'], new DateTimeZone('UTC')))->format(DateTimeInterface::ATOM);
-            } catch (Exception $e) {
-                $createdAt = null;
-            }
-        }
-
-        $results[] = [
-            'playerId'    => isset($row['player_id']) ? (int) $row['player_id'] : null,
-            'value'       => $value,
-            'createdAt'   => $createdAt,
-            'firstBidId'  => isset($row['first_bid_id']) ? (int) $row['first_bid_id'] : null,
-        ];
+        $results[] = $entry;
     }
 
     return $results;
+}
+
+function buildVerificationQueue(array $bestBids): array
+{
+    if (empty($bestBids)) {
+        return [];
+    }
+
+    $minValue = null;
+    foreach ($bestBids as $entry) {
+        if (!isset($entry['value'])) {
+            continue;
+        }
+
+        $value = (int) $entry['value'];
+        if ($minValue === null || $value < $minValue) {
+            $minValue = $value;
+        }
+    }
+
+    if ($minValue === null) {
+        return [];
+    }
+
+    $minEntries = [];
+    $others = [];
+
+    foreach ($bestBids as $entry) {
+        if (!isset($entry['value'])) {
+            continue;
+        }
+
+        $value = (int) $entry['value'];
+        if ($value === $minValue) {
+            $minEntries[] = $entry;
+        } else {
+            $others[] = $entry;
+        }
+    }
+
+    usort($minEntries, static function (array $a, array $b): int {
+        $aTokens = $a['tokensWon'] ?? 0;
+        $bTokens = $b['tokensWon'] ?? 0;
+        if ($aTokens !== $bTokens) {
+            return $aTokens <=> $bTokens;
+        }
+
+        $aTime = $a['createdAtSort'] ?? null;
+        $bTime = $b['createdAtSort'] ?? null;
+        if ($aTime !== $bTime) {
+            if ($aTime === null) {
+                return 1;
+            }
+            if ($bTime === null) {
+                return -1;
+            }
+            return $aTime <=> $bTime;
+        }
+
+        $aId = $a['firstBidId'] ?? null;
+        $bId = $b['firstBidId'] ?? null;
+        if ($aId !== $bId) {
+            if ($aId === null) {
+                return 1;
+            }
+            if ($bId === null) {
+                return -1;
+            }
+            return $aId <=> $bId;
+        }
+
+        return ($a['playerId'] ?? 0) <=> ($b['playerId'] ?? 0);
+    });
+
+    return array_merge($minEntries, $others);
 }
