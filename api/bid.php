@@ -40,7 +40,7 @@ try {
     $round = lockRoundForUpdateByRoomCode($code);
     if ($round === null) {
         $pdo->rollBack();
-        respondJson(404, ['error' => 'Room not found or no active round.']);
+        respondJson(404, ['error' => 'Room not found or no active round. Create one via POST /api/rooms/{code}/create.']);
     }
 
     $updated = false;

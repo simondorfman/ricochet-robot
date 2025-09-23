@@ -22,15 +22,27 @@ Work in progress. Current MVP includes:
 ## Install (quick start)
 
 1. Create a MySQL database and user on your host.
-2. Copy `config.sample.php` to a **private** location (outside the web root), fill credentials, and set an env var pointing to it:
-   - e.g. in Apache: `SetEnv RR_CONFIG_PATH /home/youruser/secure/rr-config.php`
-3. Run the DB bootstrap:
+2. Copy `config.sample.php` to a **private** location outside the web root (for example `/home/USER/secure/rr-config.php`) and fill in your credentials.
+3. Configure your web server to expose the file via the `RR_CONFIG_PATH` environment variable (see [Secrets](#secrets)).
+4. Run the DB bootstrap:
    - CLI: `php db/migrate.php`
    - or import `db/schema.sql` manually
-4. Deploy the code into your web root.
-5. Hit the API to verify:
+5. Deploy the code into your web root.
+6. Hit the API to verify:
    - `GET /api/rooms/TEST/state?since=-1` → JSON
    - `POST /api/rooms/TEST/bid` with `{"playerId":123,"value":12}` → starts 60s countdown
+
+### Secrets
+
+- Database credentials live in a private PHP array file (e.g., `/home/USER/secure/rr-config.php`) and must **never** be committed to Git.
+- Set the environment variable for Apache by adding the line below to `.htaccess.local` (which is ignored by Git):
+
+  ```apache
+  SetEnv RR_CONFIG_PATH /home/USER/secure/rr-config.php
+  ```
+
+- The repository’s tracked `.htaccess` automatically includes `.htaccess.local` via `IncludeOptional`, so each server can keep its own overrides.
+- `api/db.php` loads configuration in order: the path from `RR_CONFIG_PATH`, then `config.php` (gitignored), and finally `config.sample.php` as a last resort.
 
 ## Pretty API routes
 
