@@ -1,78 +1,213 @@
-<!--
-******************************************************************************
-* Fabio Lucattini <fabio.ttini [at] gmail.com>
-******************************************************************************
-* RicochetRobot project for MakeFair
-******************************************************************************
-MIT License
-Copyright (c) [2017] [Fabio Lucattini]
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-****************************************************************************** 
--->
-<!DOCTYPE html>  
-<html>
-<head> 
-    <link rel="stylesheet" type="text/css" href="css/base.css">
-<!--    <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
-    
-        <title>MAKEFAIR - ING. UNIPI TEAM</title> 
-</head> 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ricochet Robots — Multiplayer Lobby</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(160deg, #0f172a 0%, #1e293b 40%, #020617 100%);
+      color: #0f172a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 1.25rem;
+      box-sizing: border-box;
+    }
+    .landing {
+      width: min(640px, 100%);
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 24px;
+      padding: 2.25rem;
+      box-shadow: 0 35px 60px rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(18px);
+    }
+    .landing h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.75rem, 2.8vw + 1rem, 2.4rem);
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .landing p.lead {
+      margin: 0 0 1.75rem;
+      font-size: 1rem;
+      color: #475569;
+    }
+    .tablist {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 0.25rem;
+      background: rgba(148, 163, 184, 0.25);
+      margin-bottom: 1.5rem;
+    }
+    .tablist button {
+      border: none;
+      background: transparent;
+      color: #475569;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.55rem 1.2rem;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+    .tablist button[aria-selected="true"] {
+      background: #2563eb;
+      color: #fff;
+      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.45);
+    }
+    .panel {
+      display: none;
+    }
+    .panel.is-active {
+      display: block;
+    }
+    form {
+      display: grid;
+      gap: 1rem;
+    }
+    label {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 0.95rem;
+      display: grid;
+      gap: 0.5rem;
+    }
+    input[type="text"] {
+      padding: 0.65rem 0.85rem;
+      border-radius: 12px;
+      border: 1.5px solid rgba(148, 163, 184, 0.6);
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #0f172a;
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: rgba(37, 99, 235, 0.9);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+    input[type="text"][aria-invalid="true"] {
+      border-color: #dc2626;
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+    }
+    .input-hint {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin: -0.35rem 0 0;
+    }
+    .error-text {
+      font-size: 0.9rem;
+      color: #b91c1c;
+      min-height: 1.2em;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    button.primary {
+      padding: 0.7rem 1.5rem;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+      box-shadow: 0 18px 30px rgba(37, 99, 235, 0.35);
+    }
+    button.primary:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button.primary:hover:not(:disabled),
+    button.primary:focus-visible:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 24px 45px rgba(37, 99, 235, 0.45);
+      outline: none;
+    }
+    button.secondary {
+      padding: 0.65rem 1.25rem;
+      border-radius: 999px;
+      border: 1px solid rgba(37, 99, 235, 0.6);
+      background: rgba(37, 99, 235, 0.08);
+      color: #1d4ed8;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+    button.secondary:hover,
+    button.secondary:focus-visible {
+      background: rgba(37, 99, 235, 0.18);
+      outline: none;
+      transform: translateY(-1px);
+    }
+    .note {
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: #475569;
+      line-height: 1.5;
+    }
+    @media (max-width: 520px) {
+      .landing {
+        padding: 1.75rem;
+        border-radius: 18px;
+      }
+      .tablist button {
+        font-size: 0.9rem;
+        padding-inline: 1rem;
+      }
+    }
+  </style>
+  <script src="/public/js/landing.js" defer></script>
+</head>
 <body>
-    <div id="overlay" class="hideOverlay"></div>
-    <div id="core"></div>
-    <div id="topBar"> 
-        <div class="areaBar">
-            <table class="tabTop">
-                <tr>
-                    <td id="numeroMosse"></td>
-                    <td id="countdown" align="center">TIMER...</td>
-                    <td><button id="btnRandomize" class="btnRandomize" disabled>Randomize layout</button></td>
-                    <td><button id="btnUNDO" class="btnUNDO">UNDO</button></td>
-                    <td><button id="btnRESET" class="btnRESET">RESET</button></td>
-                </tr>
-            </table>
-        </div>
+  <main class="landing">
+    <h1>Ricochet Robots</h1>
+    <p class="lead">Start a fresh room for your group or jump back into an existing one.</p>
+    <div class="tablist" role="tablist" aria-label="Room actions">
+      <button type="button" id="tab-create" role="tab" aria-selected="true" aria-controls="panel-create" data-tab="create">Create room</button>
+      <button type="button" id="tab-join" role="tab" aria-selected="false" aria-controls="panel-join" data-tab="join">Join room</button>
     </div>
-    <script type="text/javascript" src="js/jquery.js"></script>
-    <script type="text/javascript" src="js/overlayManager.js"></script> 
-    <script type="text/javascript" src="js/fileManager.js"></script>
-    <script type="text/javascript" src="js/jsonManager.js"></script>
-    <script type="text/javascript" src="js/tableManager.js"></script>
-    <script type="text/javascript" src="js/robotManager.js"></script>
-    <script type="text/javascript" src="js/layoutRandomizer.js"></script>
-    <script type="text/javascript" src="js/timerManager.js"></script>
-    <script type="text/javascript" src="js/generic.js"></script>
-    <script type="text/javascript" src="js/robotComunication.js"></script>            
-    <script type="text/javascript" src="js/main.js"></script>
-    <script type="text/javascript" src="js/genericConf.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      if (window.randomizeLayout) {
-        window.randomizeLayout(); // run once on load
-      }
-      const btn = document.getElementById('btnRandomize');
-      if (btn) {
-        btn.disabled = false;
-        btn.addEventListener('click', () => window.randomizeLayout && window.randomizeLayout());
-      }
-    });
-    </script>
+    <section id="panel-create" class="panel is-active" role="tabpanel" aria-labelledby="tab-create" data-panel="create">
+      <form id="create-room-form" novalidate>
+        <label for="create-room-code">
+          Room code
+          <input id="create-room-code" name="code" type="text" maxlength="32" pattern="^[a-z][a-z0-9-]{1,31}$" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        </label>
+        <p class="input-hint">Use lowercase letters, numbers, and hyphen. Start with a letter, 2–32 characters.</p>
+        <div class="actions">
+          <button type="submit" class="primary" id="create-room-submit">Create room</button>
+          <button type="button" class="secondary" id="generate-room-code">New suggestion</button>
+        </div>
+        <p id="create-error" class="error-text" aria-live="polite"></p>
+      </form>
+    </section>
+    <section id="panel-join" class="panel" role="tabpanel" aria-labelledby="tab-join" data-panel="join" hidden>
+      <form id="join-room-form" novalidate>
+        <label for="join-room-code">
+          Room code
+          <input id="join-room-code" name="code" type="text" maxlength="32" pattern="^[a-z][a-z0-9-]{1,31}$" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        </label>
+        <p class="input-hint">Enter the code shared by the room creator.</p>
+        <div class="actions">
+          <button type="submit" class="primary" id="join-room-submit">Join room</button>
+        </div>
+        <p id="join-error" class="error-text" aria-live="polite"></p>
+      </form>
+    </section>
+    <p class="note">You can reopen the game later using the same code. We’ll remember the last room code you entered on this device.</p>
+  </main>
 </body>
 </html>

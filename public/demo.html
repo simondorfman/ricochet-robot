@@ -20,6 +20,25 @@
     .error { color: #b00020; }
     .message { margin-left: 1rem; font-size: 0.9rem; color: #333; }
     .message.error { color: #b00020; }
+    body.join-gate-open { overflow: hidden; }
+    .join-gate { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 1.5rem; z-index: 900; }
+    .join-gate[hidden] { display: none; }
+    .join-gate__panel { width: min(480px, 100%); background: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.3); }
+    .join-gate__panel h1 { margin-top: 0; margin-bottom: 0.5rem; font-size: 1.6rem; }
+    .join-gate__room { margin: 0 0 1.25rem; font-size: 0.95rem; color: #475569; font-weight: 600; }
+    .join-gate__room code { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 6px; background: #eef2ff; color: #1d4ed8; }
+    .join-gate form { display: grid; gap: 0.9rem; }
+    .join-gate label { font-weight: 600; margin-bottom: 0.35rem; color: #111827; }
+    .join-gate input, .join-gate select { width: 100%; box-sizing: border-box; }
+    .join-gate button[type="submit"] { margin-top: 0.25rem; }
+    .join-gate__status { margin-top: 0.75rem; }
+    .share-banner { margin-bottom: 1.25rem; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid #facc15; background: #fef3c7; color: #92400e; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .share-banner__text { font-weight: 600; }
+    .share-banner__link { font-weight: 600; color: inherit; word-break: break-word; text-decoration: none; }
+    .share-banner__link:focus-visible, .share-banner__link:hover { text-decoration: underline; }
+    .share-banner__actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+    .share-banner__dismiss { border: none; background: transparent; font-size: 1.15rem; line-height: 1; color: inherit; cursor: pointer; padding: 0.25rem; border-radius: 6px; }
+    .share-banner__dismiss:hover, .share-banner__dismiss:focus-visible { background: rgba(250, 204, 21, 0.25); outline: none; }
     .leading-panel { margin-top: 0.75rem; padding: 0.75rem; background: #e9f5ff; border: 1px solid #9cc9f1; border-radius: 4px; }
     .leading-panel strong { font-weight: 600; }
     #bids { list-style: none; padding-left: 0; }
@@ -116,50 +135,61 @@
   </style>
   <script src="/public/js/polling.js" defer></script>
 </head>
-<body>
-  <h1>Ricochet Robot Bidding Demo</h1>
-  <p>Use this page to experiment with the server-authoritative bidding timer. Join the same room code in two tabs to observe live updates.</p>
-
-  <fieldset>
-    <legend>Join Room</legend>
-    <form id="join-form">
-      <label>
-        Room code
-        <input id="room-code" type="text" required minlength="1" maxlength="12" autocomplete="off">
-      </label>
-      <label>
-        Display name
-        <input id="player-name" type="text" maxlength="64" autocomplete="off" required>
-      </label>
-      <label>
-        Player color
-        <div class="color-picker">
-          <span id="color-preview" class="color-preview" aria-hidden="true"></span>
-          <select id="player-color" required>
-            <option value="Purple">Purple</option>
-            <option value="Orange">Orange</option>
-            <option value="Teal">Teal</option>
-            <option value="Magenta">Magenta</option>
-            <option value="Cyan">Cyan</option>
-            <option value="Indigo">Indigo</option>
-            <option value="Amber">Amber</option>
-            <option value="Brown">Brown</option>
-            <option value="Gray">Gray</option>
-            <option value="Pink">Pink</option>
-          </select>
-        </div>
-      </label>
-      <button type="submit">Join / Update</button>
-      <span id="join-message" class="message" aria-live="polite"></span>
-    </form>
-    <div id="join-status" class="banner" hidden aria-live="polite"></div>
+<body class="join-gate-open">
+  <div id="join-gate" class="join-gate" role="dialog" aria-modal="true" aria-labelledby="join-gate-title">
+    <div class="join-gate__panel">
+      <h1 id="join-gate-title">Join the room</h1>
+      <p id="join-gate-room" class="join-gate__room" aria-live="polite" hidden></p>
+      <form id="join-form">
+        <label>
+          Room code
+          <input id="room-code" type="text" required minlength="1" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </label>
+        <label>
+          Display name
+          <input id="player-name" type="text" maxlength="64" autocomplete="off" required>
+        </label>
+        <label>
+          Player color
+          <div class="color-picker">
+            <span id="color-preview" class="color-preview" aria-hidden="true"></span>
+            <select id="player-color" required>
+              <option value="Purple">Purple</option>
+              <option value="Orange">Orange</option>
+              <option value="Teal">Teal</option>
+              <option value="Magenta">Magenta</option>
+              <option value="Cyan">Cyan</option>
+              <option value="Indigo">Indigo</option>
+              <option value="Amber">Amber</option>
+              <option value="Brown">Brown</option>
+              <option value="Gray">Gray</option>
+              <option value="Pink">Pink</option>
+            </select>
+          </div>
+        </label>
+        <button type="submit">Join room</button>
+        <span id="join-message" class="message" aria-live="polite"></span>
+      </form>
+      <div id="join-status" class="banner join-gate__status" hidden aria-live="polite"></div>
+      <div id="color-warning" class="banner" hidden></div>
+    </div>
+  </div>
+  <div id="room-app" hidden aria-hidden="true">
+    <div id="share-banner" class="share-banner" hidden role="status" aria-live="polite">
+      <span class="share-banner__text">Room created! Share this link with your friends:</span>
+      <a id="share-link" class="share-banner__link" href="" rel="noopener noreferrer"></a>
+      <div class="share-banner__actions">
+        <button type="button" id="share-copy" class="secondary">Copy</button>
+        <button type="button" id="share-dismiss" class="share-banner__dismiss" aria-label="Dismiss banner">✕</button>
+      </div>
+    </div>
+    <h1>Ricochet Robot Bidding Demo</h1>
+    <p>Use this page to experiment with the server-authoritative bidding timer. Join the same room code in two tabs to observe live updates.</p>
     <div class="join-actions">
       <button type="button" id="edit-identity" class="secondary" hidden>Change identity</button>
     </div>
-    <div id="color-warning" class="banner" hidden></div>
-  </fieldset>
 
-  <fieldset id="players-fieldset" hidden>
+    <fieldset id="players-fieldset" hidden>
     <legend>Players</legend>
     <div class="players-header">
       <div><strong id="player-count">0</strong> joined</div>
@@ -263,12 +293,21 @@
     </form>
   </fieldset>
 
+  </div>
+
   <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
 
   <script>
     (function () {
       const joinForm = document.getElementById('join-form');
       const bidForm = document.getElementById('bid-form');
+      const joinGate = document.getElementById('join-gate');
+      const joinGateRoom = document.getElementById('join-gate-room');
+      const roomApp = document.getElementById('room-app');
+      const shareBanner = document.getElementById('share-banner');
+      const shareLink = document.getElementById('share-link');
+      const shareCopyButton = document.getElementById('share-copy');
+      const shareDismissButton = document.getElementById('share-dismiss');
       const roomCodeInput = document.getElementById('room-code');
       const playerNameInput = document.getElementById('player-name');
       const playerColorInput = document.getElementById('player-color');
@@ -277,8 +316,8 @@
       const joinMessage = document.getElementById('join-message');
       const joinStatus = document.getElementById('join-status');
       const bidMessage = document.getElementById('bid-message');
-      const joinButton = joinForm.querySelector('button[type="submit"]');
-      const bidButton = bidForm.querySelector('button[type="submit"]');
+      const joinButton = joinForm ? joinForm.querySelector('button[type="submit"]') : null;
+      const bidButton = bidForm ? bidForm.querySelector('button[type="submit"]') : null;
       const editIdentityButton = document.getElementById('edit-identity');
       const bidInput = document.getElementById('bidInput');
       const playersFieldset = document.getElementById('players-fieldset');
@@ -290,6 +329,10 @@
       const nextRoundButton = document.getElementById('next-round');
       const nextMessage = document.getElementById('next-message');
 
+      const searchParams = new URLSearchParams(window.location.search);
+      let shouldShowShareBanner = searchParams.get('created') === '1';
+      let shareBannerDisplayed = false;
+
       let storedPlayerInfo = null;
       let autoJoinContext = null;
       const pathRoomMatch = window.location.pathname.match(/^\/r\/([^/]+)/i);
@@ -299,10 +342,14 @@
         roomCodeInput.readOnly = true;
         roomCodeInput.setAttribute('aria-readonly', 'true');
         storedPlayerInfo = loadStoredPlayer(initialRoomCode);
+        updateJoinGateRoom(initialRoomCode);
       }
 
       if (!storedPlayerInfo && roomCodeInput.value) {
         storedPlayerInfo = loadStoredPlayer(roomCodeInput.value);
+        if (!initialRoomCode) {
+          updateJoinGateRoom(roomCodeInput.value);
+        }
       }
 
       const globalIdentity = loadGlobalIdentity();
@@ -318,7 +365,7 @@
         const storedColor = canonicalizeColor(storedPlayerInfo.color);
         if (storedColor) {
           playerColorInput.value = storedColor;
-          if (initialRoomCode && storedName) {
+          if (initialRoomCode && storedName && storedPlayerInfo.playerId) {
             autoJoinContext = {
               code: initialRoomCode,
               displayName: storedName,
@@ -472,6 +519,7 @@
       };
       const boardWalls = new Map();
       const robotState = {};
+      let boardInitialized = false;
       let boardActive = false;
       let robotIdx = 0;
       let toastTimeoutId = null;
@@ -554,6 +602,123 @@
         showJoinStatusBanner('');
       }
 
+      function setJoinGateVisible(visible) {
+        if (joinGate) {
+          joinGate.hidden = !visible;
+        }
+        if (visible) {
+          document.body.classList.add('join-gate-open');
+          if (roomApp) {
+            roomApp.setAttribute('aria-hidden', 'true');
+          }
+        } else {
+          document.body.classList.remove('join-gate-open');
+          if (roomApp) {
+            roomApp.removeAttribute('aria-hidden');
+          }
+        }
+      }
+
+      function showRoomApp() {
+        if (roomApp) {
+          roomApp.hidden = false;
+          roomApp.removeAttribute('aria-hidden');
+        }
+      }
+
+      function updateJoinGateRoom(code) {
+        if (!joinGateRoom) {
+          return;
+        }
+        const normalized = normalizeRoomCode(code);
+        if (!normalized) {
+          joinGateRoom.textContent = '';
+          joinGateRoom.hidden = true;
+          return;
+        }
+        const display = normalized.toLowerCase();
+        joinGateRoom.hidden = false;
+        joinGateRoom.textContent = '';
+        const label = document.createElement('span');
+        label.textContent = 'Room code: ';
+        const codeEl = document.createElement('code');
+        codeEl.textContent = display;
+        joinGateRoom.appendChild(label);
+        joinGateRoom.appendChild(codeEl);
+      }
+
+      function getShareUrl(code) {
+        const normalized = normalizeRoomCode(code);
+        if (!normalized) {
+          return window.location.href;
+        }
+        const base = `${window.location.protocol}//${window.location.host}`;
+        return `${base}/r/${encodeURIComponent(normalized.toLowerCase())}`;
+      }
+
+      function consumeCreationFlag() {
+        if (!shouldShowShareBanner) {
+          return;
+        }
+        shouldShowShareBanner = false;
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('created');
+          const searchString = url.searchParams.toString();
+          const next = `${url.pathname}${searchString ? `?${searchString}` : ''}${url.hash}`;
+          window.history.replaceState(null, '', next);
+        } catch (err) {
+          // Ignore history errors.
+        }
+      }
+
+      function maybeShowShareBanner(code) {
+        if (!shareBanner || shareBannerDisplayed || !shouldShowShareBanner) {
+          return;
+        }
+        const shareUrl = getShareUrl(code);
+        if (shareLink) {
+          shareLink.href = shareUrl;
+          shareLink.textContent = shareUrl;
+        }
+        shareBanner.hidden = false;
+        shareBannerDisplayed = true;
+        consumeCreationFlag();
+      }
+
+      function hideShareBanner() {
+        if (shareBanner) {
+          shareBanner.hidden = true;
+        }
+        shareBannerDisplayed = false;
+        consumeCreationFlag();
+      }
+
+      async function copyShareLink() {
+        const shareUrl = shareLink && shareLink.href ? shareLink.href : window.location.href;
+        if (!shareUrl) {
+          return;
+        }
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(shareUrl);
+          } else {
+            const textArea = document.createElement('textarea');
+            textArea.value = shareUrl;
+            textArea.setAttribute('readonly', '');
+            textArea.style.position = 'absolute';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+          }
+          showToast('Link copied to clipboard', false);
+        } catch (err) {
+          showToast('Unable to copy link. Copy it manually.', true);
+        }
+      }
+
       function whenPollingHelpersReady(callback, onTimeout) {
         if (typeof callback !== 'function') {
           return;
@@ -584,7 +749,7 @@
           return '';
         }
         const trimmed = value.trim();
-        return trimmed ? trimmed.toUpperCase() : '';
+        return trimmed ? trimmed.toLowerCase() : '';
       }
 
       function canonicalizeColor(value) {
@@ -654,55 +819,75 @@
         return base;
       }
 
-      function storageKeyForRoom(code) {
-        const normalized = normalizeRoomCode(code);
-        return normalized ? `rr.room.${normalized}` : null;
+      function storagePrefixForRoom(code) {
+        if (typeof code !== 'string') {
+          return null;
+        }
+        const trimmed = code.trim();
+        if (!trimmed) {
+          return null;
+        }
+        return `rr.${trimmed.toLowerCase()}`;
       }
 
       function loadStoredPlayer(code) {
-        const key = storageKeyForRoom(code);
-        if (!key) {
+        const prefix = storagePrefixForRoom(code);
+        if (!prefix) {
           return null;
         }
         try {
-          const raw = window.localStorage.getItem(key);
-          if (!raw) {
-            return null;
-          }
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object' && typeof parsed.playerId === 'number') {
-            return parsed;
+          const idRaw = window.localStorage.getItem(`${prefix}.playerId`);
+          const nameRaw = window.localStorage.getItem(`${prefix}.displayName`) || '';
+          const colorRaw = window.localStorage.getItem(`${prefix}.color`) || '';
+          const parsedId = idRaw != null ? Number.parseInt(idRaw, 10) : NaN;
+          const playerId = Number.isFinite(parsedId) && parsedId > 0 ? parsedId : null;
+          const displayName = typeof nameRaw === 'string' ? nameRaw : '';
+          const color = typeof colorRaw === 'string' && colorRaw ? colorRaw : null;
+          if (playerId || displayName || color) {
+            return { playerId: playerId, displayName: displayName, color: color };
           }
         } catch (err) {
-          return null;
+          // Ignore storage errors.
         }
         return null;
       }
 
       function saveStoredPlayer(code, playerId, displayName, color) {
-        const key = storageKeyForRoom(code);
-        if (!key) {
+        const prefix = storagePrefixForRoom(code);
+        if (!prefix) {
           return;
         }
         try {
-          const payload = {
-            playerId: Number(playerId) || null,
-            displayName: displayName || '',
-            color: color || null
-          };
-          window.localStorage.setItem(key, JSON.stringify(payload));
+          if (Number.isFinite(Number(playerId)) && Number(playerId) > 0) {
+            window.localStorage.setItem(`${prefix}.playerId`, String(Number(playerId)));
+          } else {
+            window.localStorage.removeItem(`${prefix}.playerId`);
+          }
+          const trimmedName = typeof displayName === 'string' ? displayName.trim() : '';
+          if (trimmedName) {
+            window.localStorage.setItem(`${prefix}.displayName`, trimmedName);
+          } else {
+            window.localStorage.removeItem(`${prefix}.displayName`);
+          }
+          if (color) {
+            window.localStorage.setItem(`${prefix}.color`, color);
+          } else {
+            window.localStorage.removeItem(`${prefix}.color`);
+          }
         } catch (err) {
           // Ignore storage failures.
         }
       }
 
       function clearStoredPlayer(code) {
-        const key = storageKeyForRoom(code);
-        if (!key) {
+        const prefix = storagePrefixForRoom(code);
+        if (!prefix) {
           return;
         }
         try {
-          window.localStorage.removeItem(key);
+          window.localStorage.removeItem(`${prefix}.playerId`);
+          window.localStorage.removeItem(`${prefix}.displayName`);
+          window.localStorage.removeItem(`${prefix}.color`);
         } catch (err) {
           // Ignore.
         }
@@ -1262,6 +1447,7 @@
             saveStoredPlayer(normalizedCode, currentPlayerId, currentPlayerName, currentPlayerColor);
             saveGlobalIdentity(currentPlayerId, currentPlayerName, currentPlayerColor);
             storedPlayerInfo = { playerId: currentPlayerId, displayName: currentPlayerName, color: currentPlayerColor };
+            updateJoinGateRoom(currentRoomCode);
             updateColorPreview(currentPlayerColor);
             setMessage(bidMessage, '', false);
             playersFieldset.hidden = false;
@@ -1301,11 +1487,15 @@
               });
             }
 
-            const identityLabel = formatIdentityLabel(currentPlayerName, currentPlayerColor);
-            showJoinStatusBanner(`Joined as ${identityLabel}.`);
+            ensureBoardReady();
+            showRoomApp();
+            setJoinGateVisible(false);
+            maybeShowShareBanner(currentRoomCode);
+            hideJoinStatusBanner();
             setMessage(joinMessage, '', false);
             setJoinFormVisible(false);
             setEditIdentityVisible(true);
+            const identityLabel = formatIdentityLabel(currentPlayerName, currentPlayerColor);
             if (showToastOnSuccess) {
               showToast(`Joined as ${identityLabel}`, false);
             }
@@ -1373,14 +1563,28 @@
           if (joinInFlight) {
             return;
           }
+          setJoinGateVisible(true);
           setJoinFormVisible(true);
           setEditIdentityVisible(false);
+          updateJoinGateRoom(currentRoomCode || roomCodeInput.value);
           hideJoinStatusBanner();
           setMessage(joinMessage, '', false);
           hideColorWarning();
           if (playerNameInput) {
             playerNameInput.focus({ preventScroll: true });
           }
+        });
+      }
+
+      if (shareCopyButton) {
+        shareCopyButton.addEventListener('click', function () {
+          copyShareLink();
+        });
+      }
+
+      if (shareDismissButton) {
+        shareDismissButton.addEventListener('click', function () {
+          hideShareBanner();
         });
       }
 
@@ -1962,9 +2166,13 @@
       }
 
       function initBoard() {
+        if (boardInitialized) {
+          return;
+        }
         if (!boardEl || !boardGridEl || !robotLayerEl) {
           return;
         }
+        boardInitialized = true;
         if (boardEl.tabIndex < 0) {
           boardEl.tabIndex = 0;
         }
@@ -1995,7 +2203,12 @@
         updateSelectedRobotStyles();
       }
 
-      initBoard();
+      function ensureBoardReady() {
+        if (!boardInitialized) {
+          initBoard();
+        }
+      }
+
       if (toastEl) {
         toastEl.addEventListener('click', hideToast);
       }
