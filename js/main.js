@@ -31,6 +31,7 @@ var robotJSON       = jsonBaseFolder+"robots.json";
 var destinationJSON = jsonBaseFolder+"destination.json";
 
 var robM = null, jsM = null, tabM = null, over = null, fm = null, tm = null, gen = null;
+var layoutRandomizer = null;
 
 var offsetTOP = 0, offsetLEFT=0;
 
@@ -89,11 +90,18 @@ $( document ).ready(function() {
     fm   = new fileManager();
     tm   = new timerManager();
     gen  = new generic();
+    layoutRandomizer = new LayoutRandomizer(tabM, robM);
     robC = new robotComunication();
 
     jsM.generateBaseJson(tabM); 
 
-    gen.loadPage(); //azioni da fare quando si carica la pagina 
+    $("#btnRandomize").on("click", function(){
+        if(layoutRandomizer){
+            layoutRandomizer.randomizeLayout();
+        }
+    });
+
+    gen.loadPage(); //azioni da fare quando si carica la pagina
 
     var errorParam = readParameter("error");
     if(errorParam == 1){

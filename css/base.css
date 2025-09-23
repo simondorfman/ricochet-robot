@@ -119,6 +119,13 @@ body {
     font-size: 12px;
 }
 
+.emoji-target{
+    display: block;
+    font-size: 28px;
+    line-height: 32px;
+    pointer-events: none;
+}
+
 .topWall{ border-top: 5px red dashed; }
 .bottomWall{ border-bottom: 5px red dashed; }
 .leftWall{ border-left: 5px red dashed; }
@@ -285,6 +292,35 @@ body {
 .btnUNDO:hover {
     background: #fcbc3c;
     text-decoration: none;
+}
+
+.btnRandomize {
+    -webkit-border-radius: 28;
+    -moz-border-radius: 28;
+    border-radius: 28px;
+    font-family: Arial;
+    color: #ffffff;
+    font-size: 18px;
+    background: #2d89ef;
+    padding: 5px 20px 5px 20px;
+    text-decoration: none;
+    cursor: pointer;
+    left: auto;
+    right: 260px;
+    position: absolute;
+    top: 2px;
+}
+
+.btnRandomize:hover {
+    background: #1b6fdb;
+    text-decoration: none;
+}
+
+.btnRandomize:disabled,
+.btnRandomize[disabled] {
+    background: #9dbef5;
+    color: #ffffffd9;
+    cursor: not-allowed;
 }
 
 .btnRESET {
