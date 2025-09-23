@@ -4,7 +4,49 @@ declare(strict_types=1);
 
 
 /**
- * Returns a shared PDO instance using environment variables for configuration.
+ * Load the Ricochet Robot configuration array.
+ */
+function rr_config(): array
+{
+    static $config = null;
+
+    if (is_array($config)) {
+        return $config;
+    }
+
+    $paths = [];
+
+    $envPath = $_SERVER['RR_CONFIG_PATH'] ?? getenv('RR_CONFIG_PATH') ?: null;
+    if (is_string($envPath) && $envPath !== '') {
+        $paths[] = $envPath;
+    }
+
+    $rootDir = dirname(__DIR__);
+    $paths[] = $rootDir . '/config.php';
+    $paths[] = $rootDir . '/config.sample.php';
+
+    foreach ($paths as $path) {
+        if (!is_string($path) || $path === '') {
+            continue;
+        }
+
+        if (is_file($path) && is_readable($path)) {
+            $loaded = require $path;
+            if (is_array($loaded)) {
+                $config = $loaded;
+                return $config;
+            }
+        }
+    }
+
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'DB config not found. Set RR_CONFIG_PATH or provide config.php.']);
+    exit;
+}
+
+/**
+ * Returns a shared PDO instance using the resolved configuration array.
  */
 function db(): PDO
 {
@@ -14,13 +56,19 @@ function db(): PDO
         return $pdo;
     }
 
-    $host = getenv('DB_HOST') ?: 'localhost';
-    $dbname = getenv('DB_NAME') ?: 'ricochet_robot';
-    $user = getenv('DB_USER') ?: 'root';
-    $pass = getenv('DB_PASS') ?: '';
-    $charset = 'utf8mb4';
+    $config = rr_config();
 
-    $dsn = sprintf('mysql:host=%s;dbname=%s;charset=%s', $host, $dbname, $charset);
+    $host = $config['db_host'] ?? 'localhost';
+    $dbname = $config['db_name'] ?? 'ricochet_robot';
+    $user = $config['db_user'] ?? 'root';
+    $pass = $config['db_pass'] ?? '';
+    $port = isset($config['db_port']) ? (int) $config['db_port'] : 3306;
+    if ($port <= 0) {
+        $port = 3306;
+    }
+    $charset = $config['db_charset'] ?? 'utf8mb4';
+
+    $dsn = sprintf('mysql:host=%s;dbname=%s;port=%d;charset=%s', $host, $dbname, $port, $charset);
 
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

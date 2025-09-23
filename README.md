@@ -1,66 +1,46 @@
-# Ricochet Robots Project for MakeFaire 2017 #
+# Ricochet Robots — Web Multiplayer (work-in-progress)
 
-## Introduction ##
-The project aims to simulate the Ricochet Robots game in to a webpage.
-The game can be played by multiple users at the time. The first user that insert the group name starts the countdown timer, the other users that will connect after, will have the timer set to the same value of the first user.
+This is an experimental, web-based multiplayer adaptation of the board game **Ricochet Robots**  
+(see the original on BoardGameGeek: https://boardgamegeek.com/boardgame/51/ricochet-robots).
 
-The destination cell of the game and the color change eachtime a group reach it and win the round, otherwise the game maintain the same.
+The goal is to let a group on a video call open a shared room URL, bid on solutions, and
+play synchronized rounds with a server-authoritative timer (first bid starts 60s; lower bids
+do not reset the timer), then verify solutions in order of lowest bid.
 
-For the Makefaire i have also add all the necessary functionality to move the real robot with the rest api exposed by the arduino yun.
-## Screenshot ##
+## Credits
 
-### WEBPAGE ###
-On game open:
+This project is forked from: https://github.com/fabiottini/ricochet-robot  
+Huge thanks to the original author for the code and the generous MIT license.
 
-![index](README_DATA/img/screenshot_start.png "Index webpage")
+## Status
 
-On running round:
+Work in progress. Current MVP includes:
+- Server-authoritative countdown with polling/long-polling endpoints
+- Lowest-bid tracking
+- Demo UI for basic interaction
 
-![running game](README_DATA/img/screenshot_running_game.png "Running Game")
+## Install (quick start)
 
-On selected robot:
+1. Create a MySQL database and user on your host.
+2. Copy `config.sample.php` to a **private** location (outside the web root), fill credentials, and set an env var pointing to it:
+   - e.g. in Apache: `SetEnv RR_CONFIG_PATH /home/youruser/secure/rr-config.php`
+3. Run the DB bootstrap:
+   - CLI: `php db/migrate.php`
+   - or import `db/schema.sql` manually
+4. Deploy the code into your web root.
+5. Hit the API to verify:
+   - `GET /api/rooms/TEST/state?since=-1` → JSON
+   - `POST /api/rooms/TEST/bid` with `{"playerId":123,"value":12}` → starts 60s countdown
 
-![selected robot](README_DATA/img/screenshot_selected_robot.png "Selected robot")
+## Pretty API routes
 
-## CONSOLE COMMAND ##
+The `.htaccess` rewrites map pretty URLs to PHP files:
 
-I have add for testing or other purpose some extra command to run in the webbrowser console.
+- `/api/rooms/{code}/state` → `api/state.php?code={code}`
+- `/api/rooms/{code}/bid`   → `api/bid.php?code={code}`
 
-### Random simulation ###
+If rewrites are disabled, you can call the PHP files directly.
 
-To let me test all the possible special cases i have created a game simulator.
-The simulator choose randomly the robot and the movement. 
-If the simulator found an unsafe situation stop the simulation and return the robot and the position that is wrong.
+## License
 
-```
-gen.runSimulation(<NUM_MOVES>)
-//<NUM_MOVES> = represent the number of random moves to do
-
-//es.
-gen.runSimulation(10)
-//run 10 random move
-```
-
-### Read optimal solution ###
-
-Simulate the excution of the optimal solution, pre-evaluated.
-```
-fm.readJSONFromGiuseppeP()
-```
-This command read the file jsonConfiguration/optimal.json and simulate the movements the robots as described in the file.
-
-### Read optimal solution and move the LEGO robot ###
-
-For the makefaire 2017 I build this web game and others guy build the LEGO robots connected with the arduino YUN.
-
-```
-fm.readJSONFromGiuseppeP_SIMULAZIONE_ROBOT()
-```
-
-### CLEAN ALL ###
-
-This command clean all generated files in the game to reset it to the initial state
-
-```
-gen.cleanAll()
-```
+MIT (see LICENSE)

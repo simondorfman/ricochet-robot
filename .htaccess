@@ -1,0 +1,8 @@
+# Enable rewriting
+RewriteEngine On
+
+# /api/rooms/{code}/state  -> /api/state.php?code={code}
+RewriteRule ^api/rooms/([^/]+)/state$ api/state.php?code=$1 [QSA,L]
+
+# /api/rooms/{code}/bid    -> /api/bid.php?code={code}
+RewriteRule ^api/rooms/([^/]+)/bid$   api/bid.php?code=$1   [QSA,L]
