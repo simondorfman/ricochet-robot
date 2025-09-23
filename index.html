@@ -62,6 +62,17 @@ SOFTWARE.
     <script type="text/javascript" src="js/robotComunication.js"></script>            
     <script type="text/javascript" src="js/main.js"></script>
     <script type="text/javascript" src="js/genericConf.js"></script>
-    
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.randomizeLayout) {
+        window.randomizeLayout(); // run once on load
+      }
+      const btn = document.getElementById('btnRandomize');
+      if (btn) {
+        btn.disabled = false;
+        btn.addEventListener('click', () => window.randomizeLayout && window.randomizeLayout());
+      }
+    });
+    </script>
 </body>
 </html>
