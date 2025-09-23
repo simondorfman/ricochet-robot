@@ -37,8 +37,8 @@ if (!array_key_exists('playerId', $payload)) {
     respondJson(400, ['error' => 'playerId is required.']);
 }
 
-$playerId = (int) $payload['playerId'];
-if ($playerId <= 0) {
+$hostPlayerId = (int) $payload['playerId'];
+if ($hostPlayerId <= 0) {
     respondJson(400, ['error' => 'playerId must be a positive integer.']);
 }
 
@@ -56,6 +56,15 @@ try {
     if (($round['status'] ?? '') !== 'verifying') {
         $pdo->rollBack();
         respondJson(409, ['error' => 'Round is not in verifying status.']);
+    }
+
+    $hostFromRoom = array_key_exists('host_player_id', $round) && $round['host_player_id'] !== null
+        ? (int) $round['host_player_id']
+        : null;
+
+    if ($hostFromRoom === null || $hostFromRoom !== $hostPlayerId) {
+        $pdo->rollBack();
+        respondJson(403, ['error' => 'Only the host may update verification.']);
     }
 
     $queueJson = $round['verifying_queue_json'] ?? '[]';
@@ -86,31 +95,33 @@ try {
     }
 
     if ($action === 'pass') {
-        if ($currentEntry === null || ($currentEntry['playerId'] ?? 0) !== $playerId) {
+        if ($currentEntry === null || !isset($currentEntry['playerId'])) {
             $pdo->rollBack();
-            respondJson(409, ['error' => 'Player is not the current verifier.']);
+            respondJson(409, ['error' => 'No verifier available to pass.']);
         }
+
+        $winnerId = (int) $currentEntry['playerId'];
 
         $update = $pdo->prepare(
             "UPDATE rounds SET status = 'complete', winner_player_id = :winner_id, verifying_current_index = :current_index, ended_at = UTC_TIMESTAMP() WHERE id = :id"
         );
         $update->execute([
-            'winner_id'     => $playerId,
+            'winner_id'     => $winnerId,
             'current_index' => $currentIndex,
             'id'            => (int) $round['id'],
         ]);
 
-        awardTokenToPlayer((int) $round['room_id'], $playerId);
+        awardTokenToPlayer((int) $round['room_id'], $winnerId);
         bumpVersion((int) $round['id']);
 
         $pdo->commit();
-        respondJson(200, ['ok' => true, 'result' => 'pass']);
+        respondJson(200, ['ok' => true, 'result' => 'pass', 'winnerPlayerId' => $winnerId]);
     }
 
     // action === 'fail'
-    if ($currentEntry !== null && ($currentEntry['playerId'] ?? 0) !== $playerId) {
+    if ($queueCount > 0 && $currentEntry === null) {
         $pdo->rollBack();
-        respondJson(409, ['error' => 'Player is not the current verifier.']);
+        respondJson(409, ['error' => 'Unable to locate current verifier.']);
     }
 
     $nextIndex = $queueCount === 0 ? 0 : $currentIndex + 1;

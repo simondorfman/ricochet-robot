@@ -54,6 +54,19 @@ CREATE TABLE IF NOT EXISTS bids (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 SQL,
     <<<'SQL'
+CREATE TABLE IF NOT EXISTS players (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  room_id INT NOT NULL,
+  display_name VARCHAR(64) NOT NULL,
+  color VARCHAR(16) NOT NULL,
+  tokens_won INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_room_name (room_id, display_name),
+  INDEX idx_players_room (room_id),
+  FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL,
+    <<<'SQL'
 CREATE TABLE IF NOT EXISTS room_players (
   id INT AUTO_INCREMENT PRIMARY KEY,
   room_id INT NOT NULL,

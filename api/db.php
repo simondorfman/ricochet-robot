@@ -81,10 +81,228 @@ function db(): PDO
     return $pdo;
 }
 
+class PlayerAccessException extends RuntimeException
+{
+}
+
+function playerColorPalette(): array
+{
+    return [
+        'PURPLE'  => 'Purple',
+        'ORANGE'  => 'Orange',
+        'TEAL'    => 'Teal',
+        'MAGENTA' => 'Magenta',
+        'CYAN'    => 'Cyan',
+        'INDIGO'  => 'Indigo',
+        'AMBER'   => 'Amber',
+        'BROWN'   => 'Brown',
+        'GRAY'    => 'Gray',
+        'PINK'    => 'Pink',
+    ];
+}
+
+function canonicalPlayerColor(string $color): string
+{
+    $trimmed = trim($color);
+    if ($trimmed === '') {
+        throw new InvalidArgumentException('Color is required.');
+    }
+
+    $upper = strtoupper($trimmed);
+    $palette = playerColorPalette();
+
+    if (!array_key_exists($upper, $palette)) {
+        throw new InvalidArgumentException('Color not allowed.');
+    }
+
+    return $palette[$upper];
+}
+
+function fetchRoomByCode(string $code): ?array
+{
+    $stmt = db()->prepare('SELECT * FROM rooms WHERE code = :code LIMIT 1');
+    $stmt->execute(['code' => $code]);
+    $room = $stmt->fetch();
+
+    return $room !== false ? $room : null;
+}
+
+function lockRoomByCode(string $code): ?array
+{
+    $stmt = db()->prepare('SELECT * FROM rooms WHERE code = :code LIMIT 1 FOR UPDATE');
+    $stmt->execute(['code' => $code]);
+    $room = $stmt->fetch();
+
+    return $room !== false ? $room : null;
+}
+
+function fetchPlayerByRoomAndId(int $roomId, int $playerId): ?array
+{
+    $stmt = db()->prepare('SELECT * FROM players WHERE room_id = :room_id AND id = :player_id LIMIT 1');
+    $stmt->execute([
+        'room_id'   => $roomId,
+        'player_id' => $playerId,
+    ]);
+
+    $player = $stmt->fetch();
+
+    return $player !== false ? $player : null;
+}
+
+function fetchPlayerByRoomAndName(int $roomId, string $displayName): ?array
+{
+    $stmt = db()->prepare('SELECT * FROM players WHERE room_id = :room_id AND display_name = :display_name LIMIT 1');
+    $stmt->execute([
+        'room_id'      => $roomId,
+        'display_name' => $displayName,
+    ]);
+
+    $player = $stmt->fetch();
+
+    return $player !== false ? $player : null;
+}
+
+function insertPlayer(int $roomId, string $displayName, string $color): array
+{
+    $canonicalColor = canonicalPlayerColor($color);
+
+    $stmt = db()->prepare('INSERT INTO players (room_id, display_name, color, tokens_won, created_at) VALUES (:room_id, :display_name, :color, 0, UTC_TIMESTAMP())');
+    $stmt->execute([
+        'room_id'      => $roomId,
+        'display_name' => $displayName,
+        'color'        => $canonicalColor,
+    ]);
+
+    $playerId = (int) db()->lastInsertId();
+
+    return [
+        'id'           => $playerId,
+        'room_id'      => $roomId,
+        'display_name' => $displayName,
+        'color'        => $canonicalColor,
+        'tokens_won'   => 0,
+    ];
+}
+
+function createOrUpdatePlayer(int $roomId, string $displayName, string $color): array
+{
+    $displayName = trim($displayName);
+    if ($displayName === '') {
+        throw new InvalidArgumentException('Display name is required.');
+    }
+
+    $canonicalColor = canonicalPlayerColor($color);
+    $pdo = db();
+
+    $existing = fetchPlayerByRoomAndName($roomId, $displayName);
+    if ($existing !== null) {
+        if ($existing['color'] !== $canonicalColor) {
+            $update = $pdo->prepare('UPDATE players SET color = :color WHERE id = :id');
+            $update->execute([
+                'color' => $canonicalColor,
+                'id'    => (int) $existing['id'],
+            ]);
+            $existing['color'] = $canonicalColor;
+        }
+
+        return $existing;
+    }
+
+    try {
+        return insertPlayer($roomId, $displayName, $canonicalColor);
+    } catch (PDOException $e) {
+        if ($e->getCode() !== '23000') {
+            throw $e;
+        }
+
+        $retrieved = fetchPlayerByRoomAndName($roomId, $displayName);
+        if ($retrieved !== null) {
+            if ($retrieved['color'] !== $canonicalColor) {
+                $update = $pdo->prepare('UPDATE players SET color = :color WHERE id = :id');
+                $update->execute([
+                    'color' => $canonicalColor,
+                    'id'    => (int) $retrieved['id'],
+                ]);
+                $retrieved['color'] = $canonicalColor;
+            }
+
+            return $retrieved;
+        }
+
+        // If we still cannot find it, rethrow to surface the issue.
+        throw $e;
+    }
+}
+
+function updatePlayerDetails(int $roomId, int $playerId, ?string $displayName, ?string $color): array
+{
+    $player = fetchPlayerByRoomAndId($roomId, $playerId);
+    if ($player === null) {
+        throw new PlayerAccessException('Player not found in this room.');
+    }
+
+    $fields = [];
+    $params = ['id' => $playerId];
+
+    if ($displayName !== null) {
+        $trimmed = trim($displayName);
+        if ($trimmed === '') {
+            throw new InvalidArgumentException('Display name cannot be empty.');
+        }
+
+        $existing = fetchPlayerByRoomAndName($roomId, $trimmed);
+        if ($existing !== null && (int) $existing['id'] !== $playerId) {
+            throw new InvalidArgumentException('Another player already uses that name.');
+        }
+
+        $fields[] = 'display_name = :display_name';
+        $params['display_name'] = $trimmed;
+        $player['display_name'] = $trimmed;
+    }
+
+    if ($color !== null) {
+        $canonicalColor = canonicalPlayerColor($color);
+        $fields[] = 'color = :color';
+        $params['color'] = $canonicalColor;
+        $player['color'] = $canonicalColor;
+    }
+
+    if (!empty($fields)) {
+        $sql = 'UPDATE players SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+    }
+
+    return $player;
+}
+
+function fetchPlayersForRoom(int $roomId): array
+{
+    $stmt = db()->prepare('SELECT id, display_name, color, tokens_won FROM players WHERE room_id = :room_id ORDER BY created_at ASC, id ASC');
+    $stmt->execute(['room_id' => $roomId]);
+
+    $rows = $stmt->fetchAll();
+    if (!$rows) {
+        return [];
+    }
+
+    $players = [];
+    foreach ($rows as $row) {
+        $players[(int) $row['id']] = [
+            'playerId'    => (int) $row['id'],
+            'displayName' => $row['display_name'],
+            'color'       => $row['color'],
+            'tokensWon'   => isset($row['tokens_won']) ? (int) $row['tokens_won'] : 0,
+        ];
+    }
+
+    return $players;
+}
+
 function fetchCurrentRoundByRoomCode(string $code): ?array
 {
     $sql = <<<SQL
-SELECT r.*
+SELECT r.*, rm.host_player_id
 FROM rooms rm
 JOIN rounds r ON r.room_id = rm.id
 WHERE rm.code = :code
@@ -101,7 +319,7 @@ SQL;
 function lockRoundForUpdateByRoomCode(string $code): ?array
 {
     $sql = <<<SQL
-SELECT r.*
+SELECT r.*, rm.host_player_id
 FROM rooms rm
 JOIN rounds r ON r.room_id = rm.id
 WHERE rm.code = :code
@@ -196,52 +414,30 @@ SQL;
 
 function ensureRoomPlayer(int $roomId, int $playerId, ?string $name = null): void
 {
-    $normalizedName = null;
-    if ($name !== null) {
-        $trimmed = trim($name);
-        if ($trimmed !== '') {
-            $normalizedName = $trimmed;
-        }
+    $player = fetchPlayerByRoomAndId($roomId, $playerId);
+    if ($player === null) {
+        throw new PlayerAccessException('Unknown player. Join the room before bidding.');
     }
 
-    $sql = <<<SQL
-INSERT INTO room_players (room_id, player_id, name, points, tokens_won, created_at, updated_at)
-VALUES (:room_id, :player_id, :name, 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())
-ON DUPLICATE KEY UPDATE
-    name = CASE
-        WHEN :name_update IS NULL OR :name_update = '' THEN name
-        WHEN name IS NULL OR name = '' THEN :name_update
-        ELSE name
-    END,
-    updated_at = updated_at
-SQL;
-
-    $stmt = db()->prepare($sql);
-    $stmt->execute([
-        'room_id'     => $roomId,
-        'player_id'   => $playerId,
-        'name'        => $normalizedName,
-        'name_update' => $normalizedName,
-    ]);
+    if ($name !== null) {
+        $trimmed = trim($name);
+        if ($trimmed !== '' && $trimmed !== ($player['display_name'] ?? '')) {
+            updatePlayerDetails($roomId, $playerId, $trimmed, null);
+        }
+    }
 }
 
 function awardTokenToPlayer(int $roomId, int $playerId): void
 {
-    ensureRoomPlayer($roomId, $playerId, null);
-
-    $sql = <<<SQL
-UPDATE room_players
-SET tokens_won = tokens_won + 1,
-    points = points + 1,
-    updated_at = UTC_TIMESTAMP()
-WHERE room_id = :room_id AND player_id = :player_id
-SQL;
-
-    $stmt = db()->prepare($sql);
+    $stmt = db()->prepare('UPDATE players SET tokens_won = tokens_won + 1 WHERE room_id = :room_id AND id = :player_id');
     $stmt->execute([
         'room_id'   => $roomId,
         'player_id' => $playerId,
     ]);
+
+    if ($stmt->rowCount() === 0) {
+        throw new PlayerAccessException('Unable to award token to missing player.');
+    }
 }
 
 function bumpVersion(int $roundId): void
@@ -254,10 +450,12 @@ function bumpVersion(int $roundId): void
 function fetchRecentBids(int $roundId): array
 {
     $sql = <<<SQL
-SELECT player_id, value, created_at
-FROM bids
-WHERE round_id = :round_id AND value >= 2
-ORDER BY created_at ASC, id ASC
+SELECT b.player_id, b.value, b.created_at, p.display_name, p.color
+FROM bids b
+JOIN rounds r ON r.id = b.round_id
+LEFT JOIN players p ON p.id = b.player_id AND p.room_id = r.room_id
+WHERE b.round_id = :round_id AND b.value >= 2
+ORDER BY b.created_at ASC, b.id ASC
 SQL;
     $stmt = db()->prepare($sql);
     $stmt->execute(['round_id' => $roundId]);
@@ -276,9 +474,11 @@ SQL;
         }
 
         $bids[] = [
-            'playerId'  => isset($row['player_id']) ? (int) $row['player_id'] : null,
-            'value'     => isset($row['value']) ? (int) $row['value'] : null,
-            'createdAt' => $createdAt,
+            'playerId'    => isset($row['player_id']) ? (int) $row['player_id'] : null,
+            'value'       => isset($row['value']) ? (int) $row['value'] : null,
+            'createdAt'   => $createdAt,
+            'displayName' => $row['display_name'] ?? null,
+            'color'       => $row['color'] ?? null,
         ];
     }
 
@@ -288,11 +488,12 @@ SQL;
 function fetchLeaderboard(int $roomId): array
 {
     $sql = <<<SQL
-SELECT player_id, name, points, tokens_won
-FROM room_players
+SELECT id, display_name, color, tokens_won
+FROM players
 WHERE room_id = :room_id
-ORDER BY tokens_won DESC, points DESC, name ASC
+ORDER BY tokens_won DESC, display_name ASC, id ASC
 SQL;
+
     try {
         $stmt = db()->prepare($sql);
         $stmt->execute(['room_id' => $roomId]);
@@ -303,13 +504,12 @@ SQL;
 
     $leaderboard = [];
     foreach ($rows as $row) {
-        $points = isset($row['points']) ? (int) $row['points'] : 0;
-        $tokens = isset($row['tokens_won']) ? (int) $row['tokens_won'] : $points;
+        $tokens = isset($row['tokens_won']) ? (int) $row['tokens_won'] : 0;
         $leaderboard[] = [
-            'playerId'   => isset($row['player_id']) ? (int) $row['player_id'] : null,
-            'name'       => $row['name'] ?? null,
-            'points'     => $points,
-            'tokensWon'  => $tokens,
+            'playerId'    => isset($row['id']) ? (int) $row['id'] : null,
+            'displayName' => $row['display_name'] ?? null,
+            'color'       => $row['color'] ?? null,
+            'tokensWon'   => $tokens,
         ];
     }
 
@@ -324,7 +524,9 @@ SELECT
     bp.best_value,
     MIN(b.created_at) AS first_created_at,
     MIN(b.id) AS first_bid_id,
-    COALESCE(MAX(rp.tokens_won), 0) AS tokens_won
+    COALESCE(MAX(p.tokens_won), 0) AS tokens_won,
+    MAX(p.display_name) AS display_name,
+    MAX(p.color) AS color
 FROM (
     SELECT player_id, MIN(value) AS best_value
     FROM bids
@@ -334,7 +536,7 @@ FROM (
 JOIN bids b ON b.round_id = :round_id
            AND b.player_id = bp.player_id
            AND b.value = bp.best_value
-LEFT JOIN room_players rp ON rp.room_id = :room_id AND rp.player_id = bp.player_id
+LEFT JOIN players p ON p.room_id = :room_id AND p.id = bp.player_id
 GROUP BY bp.player_id, bp.best_value
 ORDER BY bp.best_value ASC, first_created_at ASC, first_bid_id ASC
 SQL;
@@ -374,6 +576,8 @@ SQL;
             'playerId'      => (int) $row['player_id'],
             'value'         => (int) $row['best_value'],
             'tokensWon'     => isset($row['tokens_won']) ? (int) $row['tokens_won'] : 0,
+            'displayName'   => $row['display_name'] ?? null,
+            'color'         => $row['color'] ?? null,
             'createdAt'     => $createdAt,
             'createdAtSort' => $createdAtSort,
             'firstBidId'    => isset($row['first_bid_id']) ? (int) $row['first_bid_id'] : null,

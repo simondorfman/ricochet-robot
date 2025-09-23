@@ -132,13 +132,34 @@ while (microtime(true) < $timeoutAt) {
             $leaderboard = [];
         }
 
+        foreach ($leaderboard as &$entry) {
+            if (isset($entry['playerId'])) {
+                $entry['playerId'] = (int) $entry['playerId'];
+            }
+            if (isset($entry['tokensWon'])) {
+                $entry['tokensWon'] = (int) $entry['tokensWon'];
+            }
+        }
+        unset($entry);
+
+        $playersById = [];
+        try {
+            $playersById = fetchPlayersForRoom((int) $round['room_id']);
+        } catch (Throwable $e) {
+            $playersById = [];
+        }
+
         $tokensByPlayer = [];
+        foreach ($playersById as $playerId => $playerInfo) {
+            $tokensByPlayer[$playerId] = isset($playerInfo['tokensWon']) ? (int) $playerInfo['tokensWon'] : 0;
+        }
+
         foreach ($leaderboard as $entry) {
             if (!isset($entry['playerId'])) {
                 continue;
             }
 
-            $tokensByPlayer[(int) $entry['playerId']] = isset($entry['tokensWon']) ? (int) $entry['tokensWon'] : (isset($entry['points']) ? (int) $entry['points'] : 0);
+            $tokensByPlayer[(int) $entry['playerId']] = isset($entry['tokensWon']) ? (int) $entry['tokensWon'] : 0;
         }
 
         $bestBids = [];
@@ -200,6 +221,8 @@ while (microtime(true) < $timeoutAt) {
                         'createdAt'     => $details['createdAt'] ?? null,
                         'createdAtSort' => $details['createdAtSort'] ?? null,
                         'firstBidId'    => $details['firstBidId'] ?? null,
+                        'displayName'   => $details['displayName'] ?? ($playersById[$playerId]['displayName'] ?? null),
+                        'color'         => $details['color'] ?? ($playersById[$playerId]['color'] ?? null),
                     ];
                     $storedQueueSeen[$playerId] = true;
                 }
@@ -262,10 +285,12 @@ while (microtime(true) < $timeoutAt) {
                     $playerId = (int) $entry['playerId'];
                     $tokensWon = isset($entry['tokensWon']) ? (int) $entry['tokensWon'] : ($tokensByPlayer[$playerId] ?? 0);
                     $tiesAtCurrentLow[] = [
-                        'playerId'  => $playerId,
-                        'value'     => $value,
-                        'tokensWon' => $tokensWon,
-                        'createdAt' => $entry['createdAt'] ?? null,
+                        'playerId'    => $playerId,
+                        'value'       => $value,
+                        'tokensWon'   => $tokensWon,
+                        'createdAt'   => $entry['createdAt'] ?? null,
+                        'displayName' => $entry['displayName'] ?? ($playersById[$playerId]['displayName'] ?? null),
+                        'color'       => $entry['color'] ?? ($playersById[$playerId]['color'] ?? null),
                     ];
                 }
 
@@ -322,12 +347,17 @@ while (microtime(true) < $timeoutAt) {
                         }
                     }
 
+                    $leaderDisplayName = $leaderDetails['displayName'] ?? ($playersById[$leaderPlayerId]['displayName'] ?? null);
+                    $leaderColor = $leaderDetails['color'] ?? ($playersById[$leaderPlayerId]['color'] ?? null);
+
                     $currentLeader = [
                         'playerId'     => $leaderPlayerId,
                         'value'        => $leaderEntry['value'],
                         'tokensWon'    => $leaderTokens,
                         'createdAt'    => $leaderCreatedAt,
                         'leaderReason' => $leaderReason,
+                        'displayName'  => $leaderDisplayName,
+                        'color'        => $leaderColor,
                     ];
 
                     $currentLowBy = $leaderPlayerId;
@@ -344,6 +374,8 @@ while (microtime(true) < $timeoutAt) {
                     'value'     => $entry['value'],
                     'tokensWon' => $entry['tokensWon'],
                     'createdAt' => $entry['createdAt'],
+                    'displayName' => $entry['displayName'] ?? ($playersById[$entry['playerId']]['displayName'] ?? null),
+                    'color'       => $entry['color'] ?? ($playersById[$entry['playerId']]['color'] ?? null),
                 ];
             }
 
@@ -362,6 +394,20 @@ while (microtime(true) < $timeoutAt) {
             ];
         }
 
+        $playersState = [];
+        foreach ($playersById as $playerId => $playerInfo) {
+            $playersState[(string) $playerId] = [
+                'displayName' => $playerInfo['displayName'] ?? null,
+                'color'       => $playerInfo['color'] ?? null,
+                'tokensWon'   => isset($playerInfo['tokensWon']) ? (int) $playerInfo['tokensWon'] : 0,
+            ];
+        }
+
+        $hostPlayerId = null;
+        if (array_key_exists('host_player_id', $round) && $round['host_player_id'] !== null) {
+            $hostPlayerId = (int) $round['host_player_id'];
+        }
+
         $payload = [
             'stateVersion' => $currentVersion,
             'status'       => $round['status'],
@@ -370,6 +416,8 @@ while (microtime(true) < $timeoutAt) {
             'currentLowBy' => $currentLowBy,
             'bids'         => $bids,
             'leaderboard'  => $leaderboard,
+            'players'      => $playersState,
+            'hostPlayerId' => $hostPlayerId,
             'serverNow'    => $now->format(DateTimeInterface::ATOM),
         ];
 

@@ -72,6 +72,24 @@
     .arrow-button.arrow-left { grid-column: 1; grid-row: 2; }
     .arrow-button.arrow-right { grid-column: 3; grid-row: 2; }
     .arrow-button.arrow-down { grid-column: 2; grid-row: 3; }
+    .color-picker { display: flex; align-items: center; gap: 0.5rem; }
+    .color-preview { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 1px solid #d1d5db; background: #f3f4f6; display: inline-block; }
+    .banner { margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #facc15; background: #fef3c7; color: #92400e; font-size: 0.95rem; }
+    .players-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .players-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+    .player-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; }
+    .player-row.is-self { border-color: #2563eb; box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35); }
+    .player-info { display: flex; align-items: center; gap: 0.5rem; }
+    .player-badge { width: 1rem; height: 1rem; border-radius: 50%; border: 1px solid rgba(17, 24, 39, 0.2); }
+    .player-name { font-weight: 600; }
+    .player-color { font-size: 0.85rem; color: #4b5563; }
+    .player-tokens { font-size: 0.9rem; color: #4b5563; min-width: 2.5rem; text-align: right; }
+    .host-status { font-weight: 600; color: #2563eb; }
+    .host-status.is-self { color: #15803d; }
+    .player-role { font-size: 0.8rem; font-weight: 600; color: #1d4ed8; }
+    button.secondary { padding: 0.5rem 0.9rem; font-weight: 600; border-radius: 6px; border: 1px solid #2563eb; background: #fff; color: #2563eb; cursor: pointer; transition: background 120ms ease, color 120ms ease; }
+    button.secondary:hover, button.secondary:focus-visible { background: #eff6ff; color: #1d4ed8; }
+    .host-controls { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
     .board-help { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.95rem; }
     .board-help summary { font-weight: 600; cursor: pointer; list-style: none; }
     .board-help summary::-webkit-details-marker { display: none; }
@@ -109,23 +127,41 @@
         <input id="room-code" type="text" required minlength="1" maxlength="12" autocomplete="off">
       </label>
       <label>
-        Player ID
-        <input id="player-id" type="number" required min="1" step="1">
+        Display name
+        <input id="player-name" type="text" maxlength="64" autocomplete="off" required>
       </label>
       <label>
-        Player Name (optional)
-        <input id="player-name" type="text" maxlength="32" autocomplete="off">
+        Player color
+        <div class="color-picker">
+          <span id="color-preview" class="color-preview" aria-hidden="true"></span>
+          <select id="player-color" required>
+            <option value="Purple">Purple</option>
+            <option value="Orange">Orange</option>
+            <option value="Teal">Teal</option>
+            <option value="Magenta">Magenta</option>
+            <option value="Cyan">Cyan</option>
+            <option value="Indigo">Indigo</option>
+            <option value="Amber">Amber</option>
+            <option value="Brown">Brown</option>
+            <option value="Gray">Gray</option>
+            <option value="Pink">Pink</option>
+          </select>
+        </div>
       </label>
-      <label>
-        Polling mode
-        <select id="polling-mode">
-          <option value="adaptive">Adaptive short polling</option>
-          <option value="long">Long polling</option>
-        </select>
-      </label>
-      <button type="submit">Create / Connect</button>
+      <button type="submit">Join / Update</button>
       <span id="join-message" class="message" aria-live="polite"></span>
     </form>
+    <div id="color-warning" class="banner" hidden></div>
+  </fieldset>
+
+  <fieldset id="players-fieldset" hidden>
+    <legend>Players</legend>
+    <div class="players-header">
+      <div><strong id="player-count">0</strong> joined</div>
+      <div id="host-status" class="host-status" aria-live="polite"></div>
+    </div>
+    <ul id="players-list" class="players-list"></ul>
+    <button type="button" id="claim-host" class="secondary" hidden>Claim Host</button>
   </fieldset>
 
   <fieldset>
@@ -153,6 +189,10 @@
         <button type="button" id="verify-fail">Fail</button>
         <span id="verify-message" class="message" aria-live="polite"></span>
       </div>
+    </div>
+    <div id="host-controls" class="host-controls" hidden>
+      <button type="button" id="next-round" class="secondary">Next Round</button>
+      <span id="next-message" class="message" aria-live="polite"></span>
     </div>
   </fieldset>
 
@@ -225,14 +265,51 @@
       const joinForm = document.getElementById('join-form');
       const bidForm = document.getElementById('bid-form');
       const roomCodeInput = document.getElementById('room-code');
-      const playerIdInput = document.getElementById('player-id');
       const playerNameInput = document.getElementById('player-name');
-      const pollingModeInput = document.getElementById('polling-mode');
+      const playerColorInput = document.getElementById('player-color');
+      const colorPreview = document.getElementById('color-preview');
+      const colorWarning = document.getElementById('color-warning');
       const joinMessage = document.getElementById('join-message');
       const bidMessage = document.getElementById('bid-message');
       const joinButton = joinForm.querySelector('button[type="submit"]');
       const bidButton = bidForm.querySelector('button[type="submit"]');
       const bidInput = document.getElementById('bidInput');
+      const playersFieldset = document.getElementById('players-fieldset');
+      const playersListEl = document.getElementById('players-list');
+      const playerCountEl = document.getElementById('player-count');
+      const hostStatusEl = document.getElementById('host-status');
+      const claimHostButton = document.getElementById('claim-host');
+      const hostControls = document.getElementById('host-controls');
+      const nextRoundButton = document.getElementById('next-round');
+      const nextMessage = document.getElementById('next-message');
+
+      let storedPlayerInfo = null;
+      const pathRoomMatch = window.location.pathname.match(/^\/r\/([^/]+)/i);
+      const initialRoomCode = pathRoomMatch ? normalizeRoomCode(decodeURIComponent(pathRoomMatch[1])) : '';
+      if (initialRoomCode) {
+        roomCodeInput.value = initialRoomCode;
+        roomCodeInput.readOnly = true;
+        roomCodeInput.setAttribute('aria-readonly', 'true');
+        storedPlayerInfo = loadStoredPlayer(initialRoomCode);
+      }
+
+      if (!storedPlayerInfo && roomCodeInput.value) {
+        storedPlayerInfo = loadStoredPlayer(roomCodeInput.value);
+      }
+
+      if (storedPlayerInfo) {
+        if (storedPlayerInfo.displayName) {
+          playerNameInput.value = storedPlayerInfo.displayName;
+        }
+        const storedColor = canonicalizeColor(storedPlayerInfo.color);
+        if (storedColor) {
+          playerColorInput.value = storedColor;
+        } else {
+          showColorWarning('Your previous color is no longer available. Please pick a new one.');
+        }
+      }
+
+      updateColorPreview(playerColorInput.value);
 
       const statusEl = document.getElementById('status');
       const versionEl = document.getElementById('state-version');
@@ -260,6 +337,11 @@
       let poller = null;
       let currentRoomCode = null;
       let currentPlayerId = null;
+      let lastStateSnapshot = null;
+      let currentPlayerName = '';
+      let currentPlayerColor = null;
+      let playersById = {};
+      let hostPlayerId = null;
       let lastServerRemaining = null;
       let lastServerTimestamp = null;
       let serverSkewMs = 0;
@@ -269,6 +351,8 @@
       let bidInFlight = false;
       let lastVerifyingState = null;
       let verifyInFlight = false;
+      let nextInFlight = false;
+      let claimInFlight = false;
       const BOARD_SIZE = 16;
       const ROBOT_ORDER = ['Blue', 'Green', 'Red', 'Yellow'];
       const ROBOT_META = {
@@ -276,6 +360,19 @@
         Green: { id: 'green', robotClass: 'robot-green', badgeClass: 'robot-badge-green', shortLabel: 'G' },
         Red: { id: 'red', robotClass: 'robot-red', badgeClass: 'robot-badge-red', shortLabel: 'R' },
         Yellow: { id: 'yellow', robotClass: 'robot-yellow', badgeClass: 'robot-badge-yellow', shortLabel: 'Y' }
+      };
+      const PLAYER_COLORS = ['Purple', 'Orange', 'Teal', 'Magenta', 'Cyan', 'Indigo', 'Amber', 'Brown', 'Gray', 'Pink'];
+      const PLAYER_COLOR_HEX = {
+        Purple: '#7c3aed',
+        Orange: '#f97316',
+        Teal: '#0d9488',
+        Magenta: '#db2777',
+        Cyan: '#06b6d4',
+        Indigo: '#4338ca',
+        Amber: '#f59e0b',
+        Brown: '#92400e',
+        Gray: '#6b7280',
+        Pink: '#ec4899'
       };
       const INITIAL_ROBOT_POSITIONS = {
         Blue: { row: 1, col: 1 },
@@ -349,6 +446,135 @@
         }
       }
 
+      function normalizeRoomCode(value) {
+        if (typeof value !== 'string') {
+          return '';
+        }
+        const trimmed = value.trim();
+        return trimmed ? trimmed.toUpperCase() : '';
+      }
+
+      function canonicalizeColor(value) {
+        if (typeof value !== 'string') {
+          return null;
+        }
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return null;
+        }
+        const match = PLAYER_COLORS.find(function (color) {
+          return color.toLowerCase() === trimmed.toLowerCase();
+        });
+        return match || null;
+      }
+
+      function updateColorPreview(color) {
+        if (!colorPreview) {
+          return;
+        }
+        const canonical = canonicalizeColor(color);
+        const hex = canonical ? PLAYER_COLOR_HEX[canonical] : null;
+        if (hex) {
+          colorPreview.style.background = hex;
+          colorPreview.style.borderColor = 'rgba(17, 24, 39, 0.3)';
+        } else {
+          colorPreview.style.background = '#f3f4f6';
+          colorPreview.style.borderColor = '#d1d5db';
+        }
+      }
+
+      function showColorWarning(text) {
+        if (!colorWarning) {
+          return;
+        }
+        const message = text || '';
+        colorWarning.textContent = message;
+        colorWarning.hidden = message === '';
+      }
+
+      function hideColorWarning() {
+        showColorWarning('');
+      }
+
+      function getPlayerInfo(playerId) {
+        const key = Number(playerId);
+        if (!Number.isFinite(key)) {
+          return null;
+        }
+        return playersById[key] || null;
+      }
+
+      function formatPlayerLabel(playerId) {
+        const info = getPlayerInfo(playerId);
+        if (info && info.displayName) {
+          return info.displayName;
+        }
+        return `Player ${playerId}`;
+      }
+
+      function formatPlayerWithColor(playerId) {
+        const info = getPlayerInfo(playerId);
+        const base = formatPlayerLabel(playerId);
+        if (info && info.color) {
+          return `${base} (${info.color})`;
+        }
+        return base;
+      }
+
+      function storageKeyForRoom(code) {
+        const normalized = normalizeRoomCode(code);
+        return normalized ? `rr.room.${normalized}` : null;
+      }
+
+      function loadStoredPlayer(code) {
+        const key = storageKeyForRoom(code);
+        if (!key) {
+          return null;
+        }
+        try {
+          const raw = window.localStorage.getItem(key);
+          if (!raw) {
+            return null;
+          }
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object' && typeof parsed.playerId === 'number') {
+            return parsed;
+          }
+        } catch (err) {
+          return null;
+        }
+        return null;
+      }
+
+      function saveStoredPlayer(code, playerId, displayName, color) {
+        const key = storageKeyForRoom(code);
+        if (!key) {
+          return;
+        }
+        try {
+          const payload = {
+            playerId: Number(playerId) || null,
+            displayName: displayName || '',
+            color: color || null
+          };
+          window.localStorage.setItem(key, JSON.stringify(payload));
+        } catch (err) {
+          // Ignore storage failures.
+        }
+      }
+
+      function clearStoredPlayer(code) {
+        const key = storageKeyForRoom(code);
+        if (!key) {
+          return;
+        }
+        try {
+          window.localStorage.removeItem(key);
+        } catch (err) {
+          // Ignore.
+        }
+      }
+
       function updateBidFormState() {
         const inputEnabled = bidAllowed && !bidInFlight;
         if (bidInput) {
@@ -372,6 +598,24 @@
         }
       }
 
+      function resetClientState() {
+        lastServerRemaining = null;
+        lastServerTimestamp = null;
+        serverSkewMs = 0;
+        hasServerSkew = false;
+        stopCountdownTicker();
+        setBidFormEnabled(false);
+        lastVerifyingState = null;
+        verifyInFlight = false;
+        nextInFlight = false;
+        if (verifyMessage) {
+          setMessage(verifyMessage, '', false);
+        }
+        if (nextMessage) {
+          setMessage(nextMessage, '', false);
+        }
+      }
+
       if (bidInput) {
         bidInput.addEventListener('input', function (event) {
           const digits = event.target.value.replace(/\D+/g, '').slice(0, 3);
@@ -388,6 +632,13 @@
             bidInput.value = '';
             setMessage(bidMessage, '', false);
           }
+        });
+      }
+
+      if (playerColorInput) {
+        playerColorInput.addEventListener('change', function () {
+          updateColorPreview(playerColorInput.value);
+          hideColorWarning();
         });
       }
 
@@ -408,10 +659,16 @@
       }
 
       function updateVerifyButtons() {
+        if (!verifyPassButton || !verifyFailButton) {
+          return;
+        }
+        const isHost = currentPlayerId != null && hostPlayerId != null && currentPlayerId === hostPlayerId;
         const currentEntry = getCurrentVerifier();
-        const enabled = Boolean(currentRoomCode && currentEntry && !verifyInFlight);
+        const enabled = Boolean(currentRoomCode && currentEntry && !verifyInFlight && isHost);
         verifyPassButton.disabled = !enabled;
         verifyFailButton.disabled = !enabled;
+        verifyPassButton.hidden = !isHost;
+        verifyFailButton.hidden = !isHost;
       }
 
       function stopCountdownTicker() {
@@ -450,11 +707,158 @@
         return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}`;
       }
 
+      function renderPlayersList() {
+        if (!playersFieldset || !playersListEl || !playerCountEl) {
+          return;
+        }
+
+        const entries = Object.values(playersById || {});
+        const hasPlayers = entries.length > 0;
+        playersFieldset.hidden = !hasPlayers && !currentRoomCode;
+        playersListEl.innerHTML = '';
+        playerCountEl.textContent = String(entries.length);
+
+        if (!hasPlayers) {
+          if (hostStatusEl) {
+            hostStatusEl.textContent = 'No host yet.';
+            hostStatusEl.classList.remove('is-self');
+          }
+          if (claimHostButton) {
+            claimHostButton.hidden = true;
+          }
+          return;
+        }
+
+        const sorted = entries.slice().sort(function (a, b) {
+          const tokensA = Number.isFinite(a.tokensWon) ? a.tokensWon : 0;
+          const tokensB = Number.isFinite(b.tokensWon) ? b.tokensWon : 0;
+          if (tokensB !== tokensA) {
+            return tokensB - tokensA;
+          }
+          const nameA = (a.displayName || '').toLowerCase();
+          const nameB = (b.displayName || '').toLowerCase();
+          if (nameA !== nameB) {
+            return nameA < nameB ? -1 : 1;
+          }
+          return a.playerId - b.playerId;
+        });
+
+        sorted.forEach(function (entry) {
+          const li = document.createElement('li');
+          li.className = 'player-row';
+          if (entry.playerId === currentPlayerId) {
+            li.classList.add('is-self');
+          }
+
+          const infoWrap = document.createElement('div');
+          infoWrap.className = 'player-info';
+
+          const badge = document.createElement('span');
+          badge.className = 'player-badge';
+          const badgeHex = entry.color && PLAYER_COLOR_HEX[entry.color] ? PLAYER_COLOR_HEX[entry.color] : '#9ca3af';
+          badge.style.background = badgeHex;
+          infoWrap.appendChild(badge);
+
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'player-name';
+          nameSpan.textContent = entry.displayName || `Player ${entry.playerId}`;
+          infoWrap.appendChild(nameSpan);
+
+          if (entry.color) {
+            const colorSpan = document.createElement('span');
+            colorSpan.className = 'player-color';
+            colorSpan.textContent = entry.color;
+            infoWrap.appendChild(colorSpan);
+          }
+
+          if (hostPlayerId != null && entry.playerId === hostPlayerId) {
+            const roleSpan = document.createElement('span');
+            roleSpan.className = 'player-role';
+            roleSpan.textContent = 'Host';
+            infoWrap.appendChild(roleSpan);
+          }
+
+          li.appendChild(infoWrap);
+
+          const tokensSpan = document.createElement('span');
+          tokensSpan.className = 'player-tokens';
+          const tokens = Number.isFinite(entry.tokensWon) ? entry.tokensWon : 0;
+          tokensSpan.textContent = `${tokens} token${tokens === 1 ? '' : 's'}`;
+          li.appendChild(tokensSpan);
+
+          playersListEl.appendChild(li);
+        });
+
+        if (hostStatusEl) {
+          if (hostPlayerId != null) {
+            if (currentPlayerId === hostPlayerId) {
+              hostStatusEl.textContent = 'You are the host.';
+              hostStatusEl.classList.add('is-self');
+            } else {
+              hostStatusEl.textContent = `Host: ${formatPlayerWithColor(hostPlayerId)}`;
+              hostStatusEl.classList.remove('is-self');
+            }
+          } else {
+            hostStatusEl.textContent = 'No host yet.';
+            hostStatusEl.classList.remove('is-self');
+          }
+        }
+
+        if (claimHostButton) {
+          const canClaim = hostPlayerId == null && currentPlayerId != null;
+          claimHostButton.hidden = !canClaim;
+          claimHostButton.disabled = !canClaim || claimInFlight;
+        }
+      }
+
+      function updateHostControls(state) {
+        if (!hostControls || !nextRoundButton) {
+          return;
+        }
+        const isHost = currentPlayerId != null && hostPlayerId != null && currentPlayerId === hostPlayerId;
+        if (!isHost) {
+          hostControls.hidden = true;
+          nextRoundButton.disabled = true;
+          return;
+        }
+        hostControls.hidden = false;
+        const canAdvance = state.status === 'complete';
+        nextRoundButton.disabled = !canAdvance || nextInFlight;
+      }
+
       function renderAll(state) {
+        lastStateSnapshot = state;
         statusEl.textContent = state.status;
         versionEl.textContent = state.stateVersion;
+        const playersState = state.players && typeof state.players === 'object' ? state.players : {};
+        const nextPlayers = {};
+        Object.keys(playersState).forEach(function (key) {
+          const id = Number(key);
+          if (!Number.isFinite(id)) {
+            return;
+          }
+          const info = playersState[key] || {};
+          nextPlayers[id] = {
+            playerId: id,
+            displayName: typeof info.displayName === 'string' ? info.displayName : '',
+            color: canonicalizeColor(info.color) || null,
+            tokensWon: Number.isFinite(info.tokensWon) ? info.tokensWon : 0
+          };
+        });
+        playersById = nextPlayers;
+        hostPlayerId = state.hostPlayerId != null && Number.isFinite(Number(state.hostPlayerId)) ? Number(state.hostPlayerId) : null;
+        if (currentPlayerId != null && playersById[currentPlayerId]) {
+          const selfInfo = playersById[currentPlayerId];
+          if (selfInfo.displayName) {
+            currentPlayerName = selfInfo.displayName;
+          }
+          if (selfInfo.color) {
+            currentPlayerColor = selfInfo.color;
+          }
+        }
+        renderPlayersList();
         lowBidEl.textContent = state.currentLow != null ? state.currentLow : '—';
-        lowBidderEl.textContent = state.currentLowBy != null ? `(by ${state.currentLowBy})` : '';
+        lowBidderEl.textContent = state.currentLowBy != null ? `(by ${formatPlayerWithColor(state.currentLowBy)})` : '';
 
         const currentLow = state.currentLow;
         const leader = state.currentLeader;
@@ -466,7 +870,8 @@
         (state.bids || []).forEach(function (bid) {
           const li = document.createElement('li');
           const when = bid.createdAt ? new Date(bid.createdAt).toLocaleTimeString() : '—';
-          let text = `Player ${bid.playerId} bid ${bid.value} @ ${when}`;
+          const label = formatPlayerWithColor(bid.playerId);
+          let text = `${label} bid ${bid.value} @ ${when}`;
 
           if (currentLow != null && bid.value === currentLow) {
             li.classList.add('bid-tie');
@@ -487,13 +892,12 @@
         (state.leaderboard || []).forEach(function (row) {
           const tr = document.createElement('tr');
           const nameCell = document.createElement('td');
-          nameCell.textContent = row.name ? `${row.name} (${row.playerId})` : row.playerId;
+          nameCell.textContent = formatPlayerWithColor(row.playerId);
           const tokensCell = document.createElement('td');
-          let tokensValue = null;
-          if (Number.isFinite(row.tokensWon)) {
-            tokensValue = row.tokensWon;
-          } else if (Number.isFinite(row.points)) {
-            tokensValue = row.points;
+          let tokensValue = Number.isFinite(row.tokensWon) ? row.tokensWon : null;
+          if (tokensValue == null) {
+            const info = getPlayerInfo(row.playerId);
+            tokensValue = info && Number.isFinite(info.tokensWon) ? info.tokensWon : 0;
           }
           tokensCell.textContent = tokensValue != null ? tokensValue : '0';
           tr.appendChild(nameCell);
@@ -533,7 +937,7 @@
               const li = document.createElement('li');
               const valueText = entry.value != null ? entry.value : '—';
               const tokensText = entry.tokensWon != null ? ` (tokens ${entry.tokensWon})` : '';
-              li.textContent = `Player ${entry.playerId} @ ${valueText}${tokensText}`;
+              li.textContent = `${formatPlayerWithColor(entry.playerId)} @ ${valueText}${tokensText}`;
               if (index === currentIndex) {
                 li.classList.add('current');
               }
@@ -545,7 +949,7 @@
           if (currentEntry) {
             const valueText = currentEntry.value != null ? currentEntry.value : '—';
             const tokensText = currentEntry.tokensWon != null ? ` (tokens ${currentEntry.tokensWon})` : '';
-            verifyingCurrent.textContent = `Current: Player ${currentEntry.playerId} @ ${valueText}${tokensText}`;
+            verifyingCurrent.textContent = `Current: ${formatPlayerWithColor(currentEntry.playerId)} @ ${valueText}${tokensText}`;
           } else {
             verifyingCurrent.textContent = 'Current: —';
           }
@@ -560,6 +964,8 @@
           updateVerifyButtons();
           setMessage(verifyMessage, '', false);
         }
+
+        updateHostControls(state);
 
         if (leader && leader.playerId != null && leader.value != null) {
           const reason = leader.leaderReason || {};
@@ -586,7 +992,7 @@
             reasonText = leaderTokens != null ? `new low bid (tokens ${leaderTokens})` : 'new low bid';
           }
 
-          const baseText = `Player ${leader.playerId} @ ${leader.value}`;
+          const baseText = `${formatPlayerWithColor(leader.playerId)} @ ${leader.value}`;
           leadingText.textContent = reasonText ? `${baseText} (reason: ${reasonText})` : baseText;
           leadingPanel.hidden = false;
         } else {
@@ -629,55 +1035,86 @@
 
       joinForm.addEventListener('submit', function (event) {
         event.preventDefault();
+        hideColorWarning();
+
         if (!window.PollingHelpers) {
           setMessage(joinMessage, 'Helpers not loaded yet. Please retry.', true);
           return;
         }
 
-        const code = roomCodeInput.value.trim();
-        const player = Number(playerIdInput.value);
-        const playerName = playerNameInput.value.trim();
-        const mode = pollingModeInput.value;
+        const code = normalizeRoomCode(roomCodeInput.value);
+        const displayName = playerNameInput.value.trim();
+        const selectedColor = canonicalizeColor(playerColorInput.value);
 
-        if (!code || !Number.isFinite(player) || player <= 0) {
-          setMessage(joinMessage, 'Enter a room code and player id.', true);
+        if (!code) {
+          setMessage(joinMessage, 'Enter a room code to join.', true);
+          return;
+        }
+        if (!displayName) {
+          setMessage(joinMessage, 'Enter a display name.', true);
+          return;
+        }
+        if (!selectedColor) {
+          showColorWarning('Choose one of the available player colors.');
+          setMessage(joinMessage, 'Pick a valid player color.', true);
           return;
         }
 
-        setMessage(joinMessage, '', false);
-        currentRoomCode = code;
-        currentPlayerId = player;
-        setMessage(bidMessage, '', false);
-
-        if (poller && typeof poller.stop === 'function') {
-          poller.stop();
-        }
-        poller = null;
-
-        lastServerRemaining = null;
-        lastServerTimestamp = null;
-        serverSkewMs = 0;
-        hasServerSkew = false;
-        stopCountdownTicker();
-        setBidFormEnabled(false);
-
+        setMessage(joinMessage, 'Joining…', false);
         joinButton.disabled = true;
 
         (async function connect() {
-          try {
-            const note = await ensureRoomExists(currentRoomCode, playerName);
-            let messagePrefix = note ? `${note.trim()} ` : '';
+          const previousRoomCode = currentRoomCode;
 
-            if (mode === 'long') {
+          try {
+            const result = await joinOrUpdatePlayer(code, displayName, selectedColor);
+            const joinedPlayerId = Number(result.playerId) || null;
+            const joinedName = result.displayName || displayName;
+            const joinedColor = canonicalizeColor(result.color) || selectedColor;
+            const joinedTokens = Number.isFinite(result.tokensWon) ? Number(result.tokensWon) : null;
+
+            currentRoomCode = code;
+            currentPlayerId = joinedPlayerId;
+            currentPlayerName = joinedName;
+            currentPlayerColor = joinedColor;
+            saveStoredPlayer(code, currentPlayerId, currentPlayerName, currentPlayerColor);
+            storedPlayerInfo = { playerId: currentPlayerId, displayName: currentPlayerName, color: currentPlayerColor };
+            updateColorPreview(currentPlayerColor);
+            setMessage(bidMessage, '', false);
+            playersFieldset.hidden = false;
+
+            const switchingRooms = !previousRoomCode || previousRoomCode !== currentRoomCode;
+
+            if (switchingRooms) {
+              if (poller && typeof poller.stop === 'function') {
+                poller.stop();
+              }
+              poller = null;
+              resetClientState();
+              playersById = {};
+              hostPlayerId = null;
+              renderPlayersList();
+              updateHostControls({ status: 'bidding' });
+            }
+
+            if (currentPlayerId != null) {
+              const existingTokens = playersById[currentPlayerId] && Number.isFinite(playersById[currentPlayerId].tokensWon)
+                ? playersById[currentPlayerId].tokensWon
+                : (joinedTokens != null ? joinedTokens : 0);
+              playersById[currentPlayerId] = {
+                playerId: currentPlayerId,
+                displayName: currentPlayerName,
+                color: currentPlayerColor,
+                tokensWon: existingTokens
+              };
+              renderPlayersList();
+              updateHostControls(lastStateSnapshot || { status: lastStateSnapshot ? lastStateSnapshot.status : 'bidding' });
+            }
+
+            if (!poller) {
               poller = window.PollingHelpers.createLongPoller({
                 code: currentRoomCode,
                 renderAll: renderAll
-              });
-            } else {
-              poller = window.PollingHelpers.createAdaptivePoller({
-                code: currentRoomCode,
-                renderAll: renderAll,
-                getRemainingFromUI: estimateRemaining
               });
             }
 
@@ -686,17 +1123,15 @@
               await startResult;
             }
 
-            setMessage(joinMessage, `${messagePrefix}Connected to room ${currentRoomCode}.`.trim(), false);
+            const joinVerb = switchingRooms ? 'Joined' : 'Updated profile in';
+            setMessage(joinMessage, `${joinVerb} room ${currentRoomCode} as ${currentPlayerName}.`, false);
           } catch (err) {
             console.error(err);
-            setMessage(joinMessage, err && err.message ? err.message : 'Unable to connect to the room.', true);
-            currentRoomCode = null;
-            currentPlayerId = null;
-            if (poller && typeof poller.stop === 'function') {
-              poller.stop();
+            const message = err && err.message ? err.message : 'Unable to join the room.';
+            setMessage(joinMessage, message, true);
+            if (err && err.status === 404) {
+              clearStoredPlayer(code);
             }
-            poller = null;
-            setBidFormEnabled(false);
           } finally {
             joinButton.disabled = false;
           }
@@ -766,6 +1201,11 @@
           return;
         }
 
+        if (hostPlayerId == null || currentPlayerId == null || currentPlayerId !== hostPlayerId) {
+          setMessage(verifyMessage, 'Only the host can mark verification results.', true);
+          return;
+        }
+
         const currentEntry = getCurrentVerifier();
         if (!currentEntry) {
           setMessage(verifyMessage, 'No verifier available.', true);
@@ -776,8 +1216,8 @@
         updateVerifyButtons();
         setMessage(verifyMessage, '', false);
 
-        window.PollingHelpers.verifyPass(currentRoomCode, currentEntry.playerId).then(function () {
-          setMessage(verifyMessage, 'Marked as solved.', false);
+        window.PollingHelpers.verifyPass(currentRoomCode, currentPlayerId).then(function () {
+          setMessage(verifyMessage, `Marked ${formatPlayerLabel(currentEntry.playerId)} as solved.`, false);
         }).catch(function (err) {
           console.error(err);
           const message = err && err.message ? err.message : 'Verification update failed.';
@@ -794,6 +1234,11 @@
           return;
         }
 
+        if (hostPlayerId == null || currentPlayerId == null || currentPlayerId !== hostPlayerId) {
+          setMessage(verifyMessage, 'Only the host can advance the queue.', true);
+          return;
+        }
+
         const currentEntry = getCurrentVerifier();
         if (!currentEntry) {
           setMessage(verifyMessage, 'No verifier available.', true);
@@ -804,7 +1249,7 @@
         updateVerifyButtons();
         setMessage(verifyMessage, '', false);
 
-        window.PollingHelpers.verifyFail(currentRoomCode, currentEntry.playerId).then(function () {
+        window.PollingHelpers.verifyFail(currentRoomCode, currentPlayerId).then(function () {
           setMessage(verifyMessage, 'Advanced to next verifier.', false);
         }).catch(function (err) {
           console.error(err);
@@ -815,6 +1260,63 @@
           updateVerifyButtons();
         });
       });
+
+      if (claimHostButton) {
+        claimHostButton.addEventListener('click', function () {
+          if (!currentRoomCode || !currentPlayerId) {
+            showToast('Join a room first.', true);
+            return;
+          }
+          if (hostPlayerId != null && currentPlayerId !== hostPlayerId) {
+            showToast('Host already assigned.', true);
+            return;
+          }
+
+          claimInFlight = true;
+          claimHostButton.disabled = true;
+          claimHostOnServer(currentRoomCode, currentPlayerId).then(function () {
+            hostPlayerId = currentPlayerId;
+            renderPlayersList();
+            updateHostControls(lastStateSnapshot || { status: lastStateSnapshot ? lastStateSnapshot.status : 'bidding' });
+            showToast('You are now the host.', false);
+          }).catch(function (err) {
+            console.error(err);
+            const message = err && err.message ? err.message : 'Unable to claim host role.';
+            showToast(message, true);
+          }).finally(function () {
+            claimInFlight = false;
+            renderPlayersList();
+          });
+        });
+      }
+
+      if (nextRoundButton) {
+        nextRoundButton.addEventListener('click', function () {
+          if (!currentRoomCode || !currentPlayerId) {
+            setMessage(nextMessage, 'Join a room first.', true);
+            return;
+          }
+          if (hostPlayerId == null || currentPlayerId !== hostPlayerId) {
+            setMessage(nextMessage, 'Only the host can start the next round.', true);
+            return;
+          }
+
+          nextInFlight = true;
+          nextRoundButton.disabled = true;
+          setMessage(nextMessage, '', false);
+
+          window.PollingHelpers.startNextRound(currentRoomCode, currentPlayerId).then(function () {
+            setMessage(nextMessage, 'Next round requested.', false);
+          }).catch(function (err) {
+            console.error(err);
+            const message = err && err.message ? err.message : 'Unable to start next round.';
+            setMessage(nextMessage, message, true);
+          }).finally(function () {
+            nextInFlight = false;
+            updateHostControls(lastStateSnapshot || { status: lastStateSnapshot ? lastStateSnapshot.status : 'complete' });
+          });
+        });
+      }
 
       function showToast(message, isError) {
         if (!toastEl) {
@@ -1231,9 +1733,8 @@
         toastEl.addEventListener('click', hideToast);
       }
 
-      async function ensureRoomExists(code, hostName) {
-        const payload = hostName ? { hostPlayerName: hostName } : {};
-        const res = await fetch(`/api/rooms/${encodeURIComponent(code)}/create`, {
+      async function postJson(url, payload) {
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -1244,17 +1745,113 @@
         } catch (err) {
           data = null;
         }
+        if (!res.ok) {
+          const message = data && data.error ? data.error : 'Request failed.';
+          const error = new Error(message);
+          error.status = res.status;
+          throw error;
+        }
+        return data || {};
+      }
 
+      async function ensureRoomCreated(code) {
+        const normalized = normalizeRoomCode(code);
+        if (!normalized) {
+          throw new Error('Room code is required.');
+        }
+        const res = await fetch(`/api/rooms/${encodeURIComponent(normalized)}/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (err) {
+          data = null;
+        }
         if (res.ok) {
           return data && data.message ? data.message : '';
         }
-
         if (res.status === 409) {
-          return data && data.error ? data.error : 'Room already exists; joining…';
+          return data && data.error ? data.error : '';
+        }
+        const errorText = data && data.error ? data.error : 'Unable to create room.';
+        const error = new Error(errorText);
+        error.status = res.status;
+        throw error;
+      }
+
+      async function joinRoomOnServer(code, displayName, color) {
+        const normalized = normalizeRoomCode(code);
+        const url = `/api/rooms/${encodeURIComponent(normalized)}/players/join`;
+        try {
+          return await postJson(url, { displayName: displayName, color: color });
+        } catch (err) {
+          if (err && err.status === 404) {
+            await ensureRoomCreated(normalized);
+            return await postJson(url, { displayName: displayName, color: color });
+          }
+          throw err;
+        }
+      }
+
+      async function updatePlayerOnServer(code, playerId, displayName, color) {
+        const normalized = normalizeRoomCode(code);
+        const body = { playerId: Number(playerId) };
+        if (typeof displayName === 'string') {
+          body.displayName = displayName;
+        }
+        if (typeof color === 'string') {
+          body.color = color;
+        }
+        return await postJson(`/api/rooms/${encodeURIComponent(normalized)}/players/update`, body);
+      }
+
+      async function joinOrUpdatePlayer(code, displayName, color) {
+        const normalized = normalizeRoomCode(code);
+        if (!normalized) {
+          throw new Error('Room code is required.');
+        }
+        const trimmedName = displayName.trim();
+        if (!trimmedName) {
+          throw new Error('Display name is required.');
+        }
+        const canonicalColor = canonicalizeColor(color);
+        if (!canonicalColor) {
+          throw new Error('Pick a valid player color.');
         }
 
-        const errorText = data && data.error ? data.error : 'Unable to create room.';
-        throw new Error(errorText);
+        if (currentPlayerId) {
+          try {
+            return await updatePlayerOnServer(normalized, currentPlayerId, trimmedName, canonicalColor);
+          } catch (err) {
+            if (!err || err.status !== 404) {
+              throw err;
+            }
+            currentPlayerId = null;
+          }
+        }
+
+        const stored = storedPlayerInfo && storedPlayerInfo.playerId ? storedPlayerInfo : loadStoredPlayer(normalized);
+        if (stored && stored.playerId) {
+          try {
+            const updated = await updatePlayerOnServer(normalized, stored.playerId, trimmedName, canonicalColor);
+            return updated;
+          } catch (err) {
+            if (!err || err.status !== 404) {
+              throw err;
+            }
+            clearStoredPlayer(normalized);
+          }
+        }
+
+        return await joinRoomOnServer(normalized, trimmedName, canonicalColor);
+      }
+
+      async function claimHostOnServer(code, playerId) {
+        const normalized = normalizeRoomCode(code);
+        return await postJson(`/api/rooms/${encodeURIComponent(normalized)}/players/claim-host`, { playerId: Number(playerId) });
       }
     }());
   </script>
