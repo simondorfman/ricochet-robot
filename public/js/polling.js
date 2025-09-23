@@ -149,10 +149,21 @@
   }
 
   async function submitBid(code, playerId, value) {
+    const normalizedPlayerId = typeof playerId === 'string' ? Number.parseInt(playerId, 10) : Number(playerId);
+    if (!Number.isInteger(normalizedPlayerId) || normalizedPlayerId <= 0) {
+      throw new Error('Player ID must be a positive integer');
+    }
+
+    const rawValue = typeof value === 'string' ? value.trim() : value;
+    const normalizedValue = Number(rawValue);
+    if (!Number.isInteger(normalizedValue) || normalizedValue < 2) {
+      throw new Error('Bid must be an integer ≥ 2');
+    }
+
     const res = await fetch(`/api/rooms/${encodeURIComponent(code)}/bid`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: Number(playerId), value: Number(value) })
+      body: JSON.stringify({ playerId: normalizedPlayerId, value: normalizedValue })
     });
     let data = null;
     try {

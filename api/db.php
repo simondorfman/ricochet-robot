@@ -158,6 +158,10 @@ function setRoundStatus(int $roundId, string $status): void
 
 function setNewLowBid(int $roundId, int $playerId, int $value): void
 {
+    if ($value < 2) {
+        throw new InvalidArgumentException('Bid value must be at least 2.');
+    }
+
     $sql = <<<SQL
 UPDATE rounds
 SET current_low_bid = :value,
@@ -174,6 +178,10 @@ SQL;
 
 function insertBid(int $roundId, int $playerId, int $value): void
 {
+    if ($value < 2) {
+        throw new InvalidArgumentException('Bid value must be at least 2.');
+    }
+
     $sql = <<<SQL
 INSERT INTO bids (round_id, player_id, value, created_at)
 VALUES (:round_id, :player_id, :value, UTC_TIMESTAMP())
@@ -248,7 +256,7 @@ function fetchRecentBids(int $roundId): array
     $sql = <<<SQL
 SELECT player_id, value, created_at
 FROM bids
-WHERE round_id = :round_id
+WHERE round_id = :round_id AND value >= 2
 ORDER BY created_at ASC, id ASC
 SQL;
     $stmt = db()->prepare($sql);
@@ -320,7 +328,7 @@ SELECT
 FROM (
     SELECT player_id, MIN(value) AS best_value
     FROM bids
-    WHERE round_id = :round_id
+    WHERE round_id = :round_id AND value >= 2
     GROUP BY player_id
 ) AS bp
 JOIN bids b ON b.round_id = :round_id
@@ -418,6 +426,9 @@ function buildVerificationQueue(array $bestBids): array
         }
 
         $value = (int) $entry['value'];
+        if ($value < 2) {
+            continue;
+        }
         if ($minValue === null || $value < $minValue) {
             $minValue = $value;
         }
@@ -436,6 +447,9 @@ function buildVerificationQueue(array $bestBids): array
         }
 
         $value = (int) $entry['value'];
+        if ($value < 2) {
+            continue;
+        }
         if ($value === $minValue) {
             $minEntries[] = $entry;
         } else {

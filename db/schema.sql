@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS bids (
   id INT AUTO_INCREMENT PRIMARY KEY,
   round_id INT NOT NULL,
   player_id INT NOT NULL,
-  value INT NOT NULL,
+  value SMALLINT UNSIGNED NOT NULL CHECK (value >= 2),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (round_id) REFERENCES rounds(id) ON DELETE CASCADE,
   INDEX idx_bids_round (round_id)
