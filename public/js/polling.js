@@ -14,7 +14,6 @@
       renderAll: options.renderAll,
       getRemainingFromUI: options.getRemainingFromUI || function () { return null; },
       since: -1,
-      serverSkewMs: 0,
       running: false
     };
 
@@ -25,7 +24,6 @@
       }
       const data = await res.json();
       state.since = data.stateVersion;
-      state.serverSkewMs = Date.parse(data.serverNow) - Date.now();
       state.renderAll(data);
     }
 
@@ -50,7 +48,7 @@
       try {
         const data = await pollOnce();
         const remaining = data ? data.remaining : (typeof state.getRemainingFromUI === 'function'
-          ? state.getRemainingFromUI(state.serverSkewMs)
+          ? state.getRemainingFromUI()
           : null);
         setTimeout(loop, adaptiveDelay(remaining));
       } catch (err) {
@@ -92,6 +90,16 @@
       stopped: false
     };
 
+    async function initialSync() {
+      const res = await fetch(`/api/rooms/${encodeURIComponent(state.code)}/state?since=-1`);
+      if (!res.ok) {
+        throw new Error('Failed to load initial state');
+      }
+      const data = await res.json();
+      state.since = data.stateVersion;
+      state.renderAll(data);
+    }
+
     async function pollLoop() {
       if (state.stopped) {
         return;
@@ -122,9 +130,15 @@
       }
     }
 
-    function start() {
+    async function start() {
+      if (!state.stopped && state.since >= 0) {
+        return;
+      }
       state.stopped = false;
-      pollLoop();
+      await initialSync();
+      if (!state.stopped) {
+        pollLoop();
+      }
     }
 
     function stop() {
@@ -135,11 +149,22 @@
   }
 
   async function submitBid(code, playerId, value) {
-    await fetch(`/api/rooms/${encodeURIComponent(code)}/bid`, {
+    const res = await fetch(`/api/rooms/${encodeURIComponent(code)}/bid`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId: Number(playerId), value: Number(value) })
     });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (err) {
+      data = null;
+    }
+    if (!res.ok) {
+      const message = data && data.error ? data.error : 'Bid failed';
+      throw new Error(message);
+    }
+    return data;
   }
 
   global.PollingHelpers = {

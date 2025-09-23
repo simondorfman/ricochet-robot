@@ -18,6 +18,8 @@
     table { width: 100%; border-collapse: collapse; }
     th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
     .error { color: #b00020; }
+    .message { margin-left: 1rem; font-size: 0.9rem; color: #333; }
+    .message.error { color: #b00020; }
   </style>
   <script src="js/polling.js" defer></script>
 </head>
@@ -37,14 +39,18 @@
         <input id="player-id" type="number" required min="1" step="1">
       </label>
       <label>
+        Player Name (optional)
+        <input id="player-name" type="text" maxlength="32" autocomplete="off">
+      </label>
+      <label>
         Polling mode
         <select id="polling-mode">
           <option value="adaptive">Adaptive short polling</option>
           <option value="long">Long polling</option>
         </select>
       </label>
-      <button type="submit">Connect</button>
-      <span id="join-error" class="error" aria-live="polite"></span>
+      <button type="submit">Create / Connect</button>
+      <span id="join-message" class="message" aria-live="polite"></span>
     </form>
   </fieldset>
 
@@ -89,7 +95,7 @@
         <input id="bid-value" type="number" min="1" step="1" required>
       </label>
       <button type="submit">Submit Bid</button>
-      <span id="bid-error" class="error" aria-live="polite"></span>
+      <span id="bid-message" class="message" aria-live="polite"></span>
     </form>
   </fieldset>
 
@@ -99,9 +105,13 @@
       const bidForm = document.getElementById('bid-form');
       const roomCodeInput = document.getElementById('room-code');
       const playerIdInput = document.getElementById('player-id');
+      const playerNameInput = document.getElementById('player-name');
       const pollingModeInput = document.getElementById('polling-mode');
-      const joinError = document.getElementById('join-error');
-      const bidError = document.getElementById('bid-error');
+      const joinMessage = document.getElementById('join-message');
+      const bidMessage = document.getElementById('bid-message');
+      const joinButton = joinForm.querySelector('button[type="submit"]');
+      const bidButton = bidForm.querySelector('button[type="submit"]');
+      const bidValueInput = document.getElementById('bid-value');
 
       const statusEl = document.getElementById('status');
       const versionEl = document.getElementById('state-version');
@@ -116,6 +126,60 @@
       let currentPlayerId = null;
       let lastServerRemaining = null;
       let lastServerTimestamp = null;
+      let serverSkewMs = 0;
+      let hasServerSkew = false;
+      let countdownTimerId = null;
+      let bidAllowed = false;
+      let bidInFlight = false;
+
+      function setMessage(element, text, isError) {
+        if (!element) {
+          return;
+        }
+        element.textContent = text || '';
+        if (isError) {
+          element.classList.add('error');
+        } else {
+          element.classList.remove('error');
+        }
+      }
+
+      function updateBidFormState() {
+        const inputEnabled = bidAllowed && !bidInFlight;
+        bidValueInput.disabled = !inputEnabled;
+        bidButton.disabled = !bidAllowed || bidInFlight;
+      }
+
+      function setBidFormEnabled(enabled) {
+        bidAllowed = Boolean(enabled);
+        updateBidFormState();
+      }
+
+      function stopCountdownTicker() {
+        if (countdownTimerId != null) {
+          clearInterval(countdownTimerId);
+          countdownTimerId = null;
+        }
+      }
+
+      function updateCountdownDisplay() {
+        const remaining = estimateRemaining();
+        if (remaining == null) {
+          remainingEl.textContent = '—';
+          return;
+        }
+        remainingEl.textContent = formatSeconds(remaining);
+        if (remaining <= 0) {
+          stopCountdownTicker();
+        }
+      }
+
+      function startCountdownTicker() {
+        updateCountdownDisplay();
+        if (countdownTimerId == null) {
+          countdownTimerId = setInterval(updateCountdownDisplay, 250);
+        }
+      }
 
       function formatSeconds(seconds) {
         if (seconds == null) {
@@ -128,10 +192,8 @@
       }
 
       function renderAll(state) {
-        joinError.textContent = '';
         statusEl.textContent = state.status;
         versionEl.textContent = state.stateVersion;
-        remainingEl.textContent = formatSeconds(state.remaining);
         lowBidEl.textContent = state.currentLow != null ? state.currentLow : '—';
         lowBidderEl.textContent = state.currentLowBy != null ? `(by ${state.currentLowBy})` : '';
 
@@ -155,15 +217,35 @@
           leaderboardEl.appendChild(tr);
         });
 
-        lastServerRemaining = state.remaining;
-        lastServerTimestamp = Date.parse(state.serverNow);
+        lastServerRemaining = typeof state.remaining === 'number' ? state.remaining : null;
+        const parsedServerNow = state.serverNow ? Date.parse(state.serverNow) : NaN;
+        if (!Number.isNaN(parsedServerNow)) {
+          lastServerTimestamp = parsedServerNow;
+          if (!hasServerSkew) {
+            serverSkewMs = parsedServerNow - Date.now();
+            hasServerSkew = true;
+          }
+        } else {
+          lastServerTimestamp = null;
+          hasServerSkew = false;
+        }
+
+        if (lastServerRemaining == null || !hasServerSkew) {
+          stopCountdownTicker();
+          remainingEl.textContent = '—';
+        } else {
+          startCountdownTicker();
+        }
+
+        const biddingOpen = state.status === 'bidding' || state.status === 'countdown';
+        setBidFormEnabled(Boolean(currentRoomCode && currentPlayerId && biddingOpen));
       }
 
-      function estimateRemaining(skewMs) {
+      function estimateRemaining() {
         if (lastServerRemaining == null || lastServerTimestamp == null) {
           return null;
         }
-        const serverNow = Date.now() + skewMs;
+        const serverNow = Date.now() + (hasServerSkew ? serverSkewMs : 0);
         const elapsed = Math.floor((serverNow - lastServerTimestamp) / 1000);
         return Math.max(0, lastServerRemaining - elapsed);
       }
@@ -171,74 +253,138 @@
       joinForm.addEventListener('submit', function (event) {
         event.preventDefault();
         if (!window.PollingHelpers) {
-          joinError.textContent = 'Helpers not loaded yet. Please retry.';
+          setMessage(joinMessage, 'Helpers not loaded yet. Please retry.', true);
           return;
         }
 
         const code = roomCodeInput.value.trim();
         const player = Number(playerIdInput.value);
+        const playerName = playerNameInput.value.trim();
         const mode = pollingModeInput.value;
 
-        if (!code || !player) {
-          joinError.textContent = 'Enter a room code and player id.';
+        if (!code || !Number.isFinite(player) || player <= 0) {
+          setMessage(joinMessage, 'Enter a room code and player id.', true);
           return;
         }
 
+        setMessage(joinMessage, '', false);
         currentRoomCode = code;
         currentPlayerId = player;
-        bidError.textContent = '';
+        setMessage(bidMessage, '', false);
 
         if (poller && typeof poller.stop === 'function') {
           poller.stop();
         }
+        poller = null;
 
         lastServerRemaining = null;
         lastServerTimestamp = null;
+        serverSkewMs = 0;
+        hasServerSkew = false;
+        stopCountdownTicker();
+        setBidFormEnabled(false);
 
-        try {
-          if (mode === 'long') {
-            poller = window.PollingHelpers.createLongPoller({
-              code: code,
-              renderAll: renderAll
-            });
-            poller.start();
-          } else {
-            poller = window.PollingHelpers.createAdaptivePoller({
-              code: code,
-              renderAll: renderAll,
-              getRemainingFromUI: estimateRemaining
-            });
-            poller.start().catch(function (err) {
-              console.error(err);
-              joinError.textContent = 'Unable to connect to the room.';
-            });
+        joinButton.disabled = true;
+
+        (async function connect() {
+          try {
+            const note = await ensureRoomExists(currentRoomCode, playerName);
+            let messagePrefix = note ? `${note.trim()} ` : '';
+
+            if (mode === 'long') {
+              poller = window.PollingHelpers.createLongPoller({
+                code: currentRoomCode,
+                renderAll: renderAll
+              });
+            } else {
+              poller = window.PollingHelpers.createAdaptivePoller({
+                code: currentRoomCode,
+                renderAll: renderAll,
+                getRemainingFromUI: estimateRemaining
+              });
+            }
+
+            const startResult = poller.start();
+            if (startResult && typeof startResult.then === 'function') {
+              await startResult;
+            }
+
+            setMessage(joinMessage, `${messagePrefix}Connected to room ${currentRoomCode}.`.trim(), false);
+          } catch (err) {
+            console.error(err);
+            setMessage(joinMessage, err && err.message ? err.message : 'Unable to connect to the room.', true);
+            currentRoomCode = null;
+            currentPlayerId = null;
+            if (poller && typeof poller.stop === 'function') {
+              poller.stop();
+            }
+            poller = null;
+            setBidFormEnabled(false);
+          } finally {
+            joinButton.disabled = false;
           }
-        } catch (err) {
-          console.error(err);
-          joinError.textContent = 'Unable to connect to the room.';
-        }
+        }());
       });
 
       bidForm.addEventListener('submit', function (event) {
         event.preventDefault();
-        bidError.textContent = '';
+        setMessage(bidMessage, '', false);
 
         if (!currentRoomCode || !currentPlayerId) {
-          bidError.textContent = 'Join a room first.';
+          setMessage(bidMessage, 'Join a room first.', true);
           return;
         }
 
-        const value = Number(document.getElementById('bid-value').value);
+        const value = Number(bidValueInput.value);
         if (!Number.isFinite(value) || value <= 0) {
-          bidError.textContent = 'Enter a positive bid value.';
+          setMessage(bidMessage, 'Enter a positive bid value.', true);
           return;
         }
 
-        window.PollingHelpers.submitBid(currentRoomCode, currentPlayerId, value).catch(function (err) {
+        bidInFlight = true;
+        updateBidFormState();
+        window.PollingHelpers.submitBid(currentRoomCode, currentPlayerId, value).then(function () {
+          bidValueInput.value = '';
+        }).catch(function (err) {
           console.error(err);
-          bidError.textContent = 'Bid failed.';
+          const message = err && err.message ? err.message : 'Bid failed.';
+          setMessage(bidMessage, message, true);
+          if (message.toLowerCase().includes('bidding is closed')) {
+            setBidFormEnabled(false);
+          }
+        }).finally(function () {
+          bidInFlight = false;
+          updateBidFormState();
         });
       });
+
+      setBidFormEnabled(false);
+
+      async function ensureRoomExists(code, hostName) {
+        const payload = hostName ? { hostPlayerName: hostName } : {};
+        const res = await fetch(`/api/rooms/${encodeURIComponent(code)}/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (err) {
+          data = null;
+        }
+
+        if (res.ok) {
+          return data && data.message ? data.message : '';
+        }
+
+        if (res.status === 409) {
+          return data && data.error ? data.error : 'Room already exists; joining…';
+        }
+
+        const errorText = data && data.error ? data.error : 'Unable to create room.';
+        throw new Error(errorText);
+      }
     }());
   </script>
 </body>
