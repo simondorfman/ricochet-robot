@@ -22,7 +22,7 @@ while (microtime(true) < $timeoutAt) {
     }
 
     if ($round === null) {
-        respondJson(404, ['error' => 'Room not found or no active round.']);
+        respondJson(404, ['error' => 'Room not found or no active round. Create one via POST /api/rooms/{code}/create.']);
     }
 
     $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));

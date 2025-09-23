@@ -2,3 +2,5 @@
 config.php
 rr-config.php
 .env
+# Per-server Apache overrides (secrets)
+.htaccess.local

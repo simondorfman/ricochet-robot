@@ -6,3 +6,12 @@ RewriteRule ^api/rooms/([^/]+)/state$ api/state.php?code=$1 [QSA,L]
 
 # /api/rooms/{code}/bid    -> /api/bid.php?code={code}
 RewriteRule ^api/rooms/([^/]+)/bid$   api/bid.php?code=$1   [QSA,L]
+
+# POST /api/rooms/{code}/create -> api/create_room.php?code={code}
+RewriteRule ^api/rooms/([^/]+)/create$ api/create_room.php?code=$1 [QSA,L]
+
+# --- Local overrides (not tracked) ---
+# Allows per-server secrets without committing them to Git.
+# On DreamHost/Apache 2.4 this is supported; if unavailable, admins can paste
+# their SetEnv line directly into .htaccess as a fallback.
+IncludeOptional .htaccess.local
