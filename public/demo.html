@@ -699,7 +699,7 @@
           const url = new URL(window.location.href);
           url.searchParams.delete('created');
           const searchString = url.searchParams.toString();
-          const next = `${url.pathname}${searchString ? `?${searchString}` : ''}${url.hash}`;
+          const next = `${url.pathname}${searchString && searchString.length > 0 ? `?${searchString}` : ''}${url.hash}`;
           window.history.replaceState(null, '', next);
         } catch (err) {
           // Ignore history errors.
