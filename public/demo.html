@@ -299,6 +299,9 @@
 
   <script>
     (function () {
+      console.log('Script starting, checking PollingHelpers availability');
+      console.log('PollingHelpers available:', !!window.PollingHelpers);
+      
       const joinForm = document.getElementById('join-form');
       const bidForm = document.getElementById('bid-form');
       const joinGate = document.getElementById('join-gate');
@@ -398,13 +401,12 @@
         if (globalName) {
           playerNameInput.value = globalName;
         }
-        const globalColor = canonicalizeColor(globalIdentity.color);
+        const globalColor = null; // Will be set later after functions are defined
         if (globalColor) {
           playerColorInput.value = globalColor;
         }
       }
 
-      updateColorPreview(playerColorInput.value);
 
       if (autoJoinContext) {
         setJoinFormVisible(false);
@@ -481,6 +483,20 @@
         Gray: '#6b7280',
         Pink: '#ec4899'
       };
+
+      function canonicalizeColor(value) {
+        if (typeof value !== 'string') {
+          return null;
+        }
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return null;
+        }
+        const match = PLAYER_COLORS.find(function (color) {
+          return color.toLowerCase() === trimmed.toLowerCase();
+        });
+        return match || null;
+      }
       const INITIAL_ROBOT_POSITIONS = {
         Blue: { row: 1, col: 1 },
         Green: { row: 1, col: 14 },
@@ -771,20 +787,6 @@
         }
         const trimmed = value.trim();
         return trimmed ? trimmed.toLowerCase() : '';
-      }
-
-      function canonicalizeColor(value) {
-        if (typeof value !== 'string') {
-          return null;
-        }
-        const trimmed = value.trim();
-        if (!trimmed) {
-          return null;
-        }
-        const match = PLAYER_COLORS.find(function (color) {
-          return color.toLowerCase() === trimmed.toLowerCase();
-        });
-        return match || null;
       }
 
       function updateColorPreview(color) {
@@ -1420,13 +1422,17 @@
       }
 
       function runJoinFlow(code, displayName, selectedColor, options) {
+        console.log('runJoinFlow called with:', { code, displayName, selectedColor, options });
         const normalizedCode = normalizeRoomCode(code);
         const sanitizedName = typeof displayName === 'string' ? displayName.trim() : '';
         const canonicalColor = canonicalizeColor(selectedColor);
         const auto = Boolean(options && options.auto);
         const showToastOnSuccess = !(options && options.showToast === false);
 
+        console.log('Normalized values:', { normalizedCode, sanitizedName, canonicalColor });
+
         if (!normalizedCode || !isValidRoomCode(normalizedCode) || !sanitizedName || !canonicalColor) {
+          console.log('Validation failed in runJoinFlow');
           if (!auto && joinForm && !joinForm.hidden) {
             setJoinFormDisabled(false);
           }
@@ -1434,12 +1440,14 @@
         }
 
         if (joinInFlight) {
+          console.log('Join already in flight');
           if (!auto && joinForm && !joinForm.hidden) {
             setJoinFormDisabled(false);
           }
           return;
         }
 
+        console.log('Starting join process');
         joinInFlight = true;
 
         if (auto) {
@@ -1452,7 +1460,9 @@
           const previousRoomCode = currentRoomCode;
 
           try {
+            console.log('Calling joinOrUpdatePlayer with:', { normalizedCode, sanitizedName, canonicalColor });
             const result = await joinOrUpdatePlayer(normalizedCode, sanitizedName, canonicalColor);
+            console.log('joinOrUpdatePlayer result:', result);
             const joinedPlayerId = Number(result.playerId) || null;
             const joinedName = result.displayName || sanitizedName;
             const joinedColor = canonicalizeColor(result.color) || canonicalColor;
@@ -1522,8 +1532,9 @@
               await startResult;
             }
           } catch (err) {
-            console.error(err);
+            console.error('Error in join flow:', err);
             const message = err && err.message ? err.message : 'Unable to join the room.';
+            console.log('Error message:', message);
             if (auto) {
               setJoinFormVisible(true);
             }
@@ -1545,10 +1556,49 @@
 
       joinForm.addEventListener('submit', function (event) {
         event.preventDefault();
+        console.log('Join form submitted');
         hideColorWarning();
 
         if (!window.PollingHelpers) {
-          setMessage(joinMessage, 'Helpers not loaded yet. Please retry.', true);
+          console.log('PollingHelpers not available, trying direct join');
+          // Try to join directly without PollingHelpers
+          const code = normalizeRoomCode(roomCodeInput.value);
+          const displayName = playerNameInput.value.trim();
+          const selectedColor = canonicalizeColor(playerColorInput.value);
+          
+          if (!code || !displayName || !selectedColor) {
+            setMessage(joinMessage, 'Please fill in all fields.', true);
+            return;
+          }
+          
+          setMessage(joinMessage, 'Joining directly...', false);
+          setJoinFormDisabled(true);
+          
+          // Call joinOrUpdatePlayer directly
+          joinOrUpdatePlayer(code, displayName, selectedColor).then(function(result) {
+            console.log('Direct join result:', result);
+            // Manually trigger the success flow
+            const joinedPlayerId = Number(result.playerId) || null;
+            const joinedName = result.displayName || displayName;
+            const joinedColor = canonicalizeColor(result.color) || selectedColor;
+            
+            currentRoomCode = code;
+            currentPlayerId = joinedPlayerId;
+            currentPlayerName = joinedName;
+            currentPlayerColor = joinedColor;
+            
+            showRoomApp();
+            setJoinGateVisible(false);
+            setMessage(joinMessage, '', false);
+            setJoinFormVisible(false);
+            setEditIdentityVisible(true);
+            
+            console.log('Direct join successful');
+          }).catch(function(err) {
+            console.error('Direct join failed:', err);
+            setMessage(joinMessage, err.message || 'Failed to join room', true);
+            setJoinFormDisabled(false);
+          });
           return;
         }
 
@@ -1556,24 +1606,31 @@
         const displayName = playerNameInput.value.trim();
         const selectedColor = canonicalizeColor(playerColorInput.value);
 
+        console.log('Form data:', { code, displayName, selectedColor });
+
         if (!code) {
+          console.log('No room code provided');
           setMessage(joinMessage, 'Enter a room code to join.', true);
           return;
         }
         if (!isValidRoomCode(code)) {
+          console.log('Invalid room code:', code);
           setMessage(joinMessage, 'Room codes use lowercase letters, numbers, and single hyphen (no leading, trailing, or double hyphen).', true);
           return;
         }
         if (!displayName) {
+          console.log('No display name provided');
           setMessage(joinMessage, 'Enter a display name.', true);
           return;
         }
         if (!selectedColor) {
+          console.log('No color selected');
           showColorWarning('Choose one of the available player colors.');
           setMessage(joinMessage, 'Pick a valid player color.', true);
           return;
         }
 
+        console.log('All validation passed, starting join flow');
         roomCodeInput.value = code;
         playerNameInput.value = displayName;
         setMessage(joinMessage, 'Joining…', false);
@@ -1610,6 +1667,14 @@
           hideShareBanner();
         });
       }
+
+      // Check PollingHelpers availability after a short delay
+      setTimeout(function() {
+        console.log('After timeout, PollingHelpers available:', !!window.PollingHelpers);
+        if (!window.PollingHelpers) {
+          console.log('PollingHelpers still not available after timeout');
+        }
+      }, 1000);
 
       if (autoJoinContext && !autoJoinScheduled) {
         autoJoinScheduled = true;
@@ -2364,6 +2429,20 @@
           throw new Error('Room code is required.');
         }
         return await postJson(`/api/rooms/${encodeURIComponent(normalized)}/players/claim-host`, { playerId: Number(playerId) });
+      }
+
+      // Initialize color preview after all functions are defined
+      if (playerColorInput && typeof updateColorPreview === 'function') {
+        updateColorPreview(playerColorInput.value);
+      }
+
+      // Set global color if available
+      if (globalIdentity && globalIdentity.color && playerColorInput) {
+        const globalColor = canonicalizeColor(globalIdentity.color);
+        if (globalColor) {
+          playerColorInput.value = globalColor;
+          updateColorPreview(globalColor);
+        }
       }
     }());
   </script>

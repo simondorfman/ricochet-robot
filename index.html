@@ -40,32 +40,9 @@
       color: #475569;
     }
     .tablist {
-      display: inline-flex;
-      border-radius: 999px;
-      padding: 0.25rem;
-      background: rgba(148, 163, 184, 0.25);
-      margin-bottom: 1.5rem;
-    }
-    .tablist button {
-      border: none;
-      background: transparent;
-      color: #475569;
-      font-weight: 600;
-      font-size: 0.95rem;
-      padding: 0.55rem 1.2rem;
-      border-radius: 999px;
-      cursor: pointer;
-      transition: background 140ms ease, color 140ms ease, transform 140ms ease;
-    }
-    .tablist button[aria-selected="true"] {
-      background: #2563eb;
-      color: #fff;
-      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.45);
-    }
-    .panel {
       display: none;
     }
-    .panel.is-active {
+    .panel {
       display: block;
     }
     form {
@@ -164,10 +141,6 @@
         padding: 1.75rem;
         border-radius: 18px;
       }
-      .tablist button {
-        font-size: 0.9rem;
-        padding-inline: 1rem;
-      }
     }
   </style>
   <script src="/public/js/landing.js" defer></script>
@@ -175,12 +148,8 @@
 <body>
   <main class="landing">
     <h1>Ricochet Robots</h1>
-    <p class="lead">Start a fresh room for your group or jump back into an existing one.</p>
-    <div class="tablist" role="tablist" aria-label="Room actions">
-      <button type="button" id="tab-create" role="tab" aria-selected="true" aria-controls="panel-create" data-tab="create">Create room</button>
-      <button type="button" id="tab-join" role="tab" aria-selected="false" aria-controls="panel-join" data-tab="join">Join room</button>
-    </div>
-    <section id="panel-create" class="panel is-active" role="tabpanel" aria-labelledby="tab-create" data-panel="create">
+    <p class="lead">Create a room for your group to play Ricochet Robots.</p>
+    <section id="panel-create" class="panel">
       <form id="create-room-form" novalidate>
         <label for="create-room-code">
           Room code
@@ -194,20 +163,7 @@
         <p id="create-error" class="error-text" aria-live="polite"></p>
       </form>
     </section>
-    <section id="panel-join" class="panel" role="tabpanel" aria-labelledby="tab-join" data-panel="join" hidden>
-      <form id="join-room-form" novalidate>
-        <label for="join-room-code">
-          Room code
-          <input id="join-room-code" name="code" type="text" maxlength="32" pattern="^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$" autocomplete="off" autocapitalize="none" spellcheck="false" required>
-        </label>
-        <p class="input-hint">Enter the code shared by the room creator.</p>
-        <div class="actions">
-          <button type="submit" class="primary" id="join-room-submit">Join room</button>
-        </div>
-        <p id="join-error" class="error-text" aria-live="polite"></p>
-      </form>
-    </section>
-    <p class="note">You can reopen the game later using the same code. We’ll remember the last room code you entered on this device.</p>
+    <p class="note">Share the room code with your friends so they can join. You can reopen the game later using the same code.</p>
   </main>
 </body>
 </html>

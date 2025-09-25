@@ -118,57 +118,10 @@
     return '';
   }
 
-  function switchTab(name, elements) {
-    const { tabButtons, panels } = elements;
-    tabButtons.forEach((button) => {
-      const isActive = button.dataset.tab === name;
-      button.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      button.tabIndex = isActive ? 0 : -1;
-    });
-    panels.forEach((panel) => {
-      const isActive = panel.dataset.panel === name;
-      panel.classList.toggle('is-active', isActive);
-      panel.hidden = !isActive;
-    });
-  }
-
-  function focusFirstField(name, refs) {
-    if (name === 'create' && refs.createCodeInput) {
+  function focusFirstField(refs) {
+    if (refs.createCodeInput) {
       refs.createCodeInput.focus({ preventScroll: true });
-    } else if (name === 'join' && refs.joinCodeInput) {
-      refs.joinCodeInput.focus({ preventScroll: true });
     }
-  }
-
-  function attachTabKeyboardNavigation(container, elements) {
-    if (!container) {
-      return;
-    }
-    container.addEventListener('keydown', (event) => {
-      const key = event.key;
-      if (key !== 'ArrowLeft' && key !== 'ArrowRight') {
-        return;
-      }
-      event.preventDefault();
-      const order = elements.tabButtons;
-      const activeIndex = order.findIndex((btn) => btn.getAttribute('aria-selected') === 'true');
-      if (activeIndex < 0) {
-        return;
-      }
-      const delta = key === 'ArrowLeft' ? -1 : 1;
-      let nextIndex = (activeIndex + delta + order.length) % order.length;
-      const nextButton = order[nextIndex];
-      if (!nextButton) {
-        return;
-      }
-      const targetTab = nextButton.dataset.tab;
-      if (!targetTab) {
-        return;
-      }
-      switchTab(targetTab, elements);
-      focusFirstField(targetTab, elements);
-      nextButton.focus({ preventScroll: true });
-    });
   }
 
   function redirectToRoom(code, created) {
@@ -178,50 +131,23 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    const tabButtons = Array.from(document.querySelectorAll('[data-tab]'));
-    const panels = Array.from(document.querySelectorAll('[data-panel]'));
-    const tablist = document.querySelector('.tablist');
     const createForm = document.getElementById('create-room-form');
     const createCodeInput = document.getElementById('create-room-code');
     const createSubmit = document.getElementById('create-room-submit');
     const createError = document.getElementById('create-error');
     const regenerateButton = document.getElementById('generate-room-code');
-    const joinForm = document.getElementById('join-room-form');
-    const joinCodeInput = document.getElementById('join-room-code');
-    const joinSubmit = document.getElementById('join-room-submit');
-    const joinError = document.getElementById('join-error');
 
     const refs = {
-      tabButtons,
-      panels,
-      createCodeInput,
-      joinCodeInput
+      createCodeInput
     };
-
-    const elements = { tabButtons, panels };
 
     const suggested = generateRoomCode();
     if (createCodeInput && !createCodeInput.value) {
       createCodeInput.value = suggested;
     }
 
-    const lastCode = getLastCode();
-    if (joinCodeInput && !joinCodeInput.value && lastCode) {
-      joinCodeInput.value = lastCode;
-    }
-
-    tabButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        const tabName = button.dataset.tab;
-        if (!tabName) {
-          return;
-        }
-        switchTab(tabName, elements);
-        focusFirstField(tabName, refs);
-      });
-    });
-
-    attachTabKeyboardNavigation(tablist, elements);
+    // Focus the input on page load
+    focusFirstField(refs);
 
     if (createCodeInput) {
       createCodeInput.addEventListener('input', () => {
@@ -240,24 +166,6 @@
       });
     }
 
-    if (joinCodeInput) {
-      joinCodeInput.addEventListener('input', () => {
-        setFieldError(joinCodeInput, joinError, '');
-      });
-      joinCodeInput.addEventListener('blur', () => {
-        if (!joinCodeInput) {
-          return;
-        }
-        const formatted = sanitizeUserInput(joinCodeInput.value);
-        joinCodeInput.value = formatted;
-        if (formatted) {
-          const message = validateCode(formatted);
-          if (message) {
-            setFieldError(joinCodeInput, joinError, message);
-          }
-        }
-      });
-    }
 
     if (regenerateButton && createCodeInput) {
       regenerateButton.addEventListener('click', () => {
@@ -312,23 +220,5 @@
       });
     }
 
-    if (joinForm && joinSubmit && joinCodeInput) {
-      joinForm.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const code = sanitizeUserInput(joinCodeInput.value);
-        joinCodeInput.value = code;
-        const errorText = validateCode(code);
-        if (errorText) {
-          setFieldError(joinCodeInput, joinError, errorText);
-          joinCodeInput.focus({ preventScroll: true });
-          return;
-        }
-        setFieldError(joinCodeInput, joinError, '');
-        joinSubmit.disabled = true;
-        joinSubmit.textContent = 'Joining…';
-        saveLastCode(code);
-        redirectToRoom(code, false);
-      });
-    }
   });
 })();
