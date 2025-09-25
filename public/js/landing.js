@@ -11,7 +11,7 @@
     'tiger', 'urchin', 'viper', 'walrus', 'yak', 'zorilla', 'falcon', 'goose', 'kiwi', 'owl',
     'puppy', 'turtle', 'swiftlet', 'lynx', 'panther', 'phoenix', 'sparrow', 'corgi'
   ];
-  const CODE_REGEX = /^[a-z][a-z0-9-]{1,31}$/;
+  const CODE_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
   const DOUBLE_HYPHEN = /--/;
   const LAST_CODE_KEY = 'rr.lastRoomCode';
 
@@ -74,7 +74,11 @@
   function getLastCode() {
     try {
       const stored = window.localStorage.getItem(LAST_CODE_KEY);
-      return typeof stored === 'string' ? stored : '';
+      if (typeof stored !== 'string') {
+        return '';
+      }
+      const normalized = sanitizeUserInput(stored);
+      return isValidRoomCode(normalized) ? normalized : '';
     } catch (err) {
       return '';
     }
@@ -82,8 +86,9 @@
 
   function saveLastCode(code) {
     try {
-      if (code) {
-        window.localStorage.setItem(LAST_CODE_KEY, code);
+      const normalized = sanitizeUserInput(code);
+      if (normalized && isValidRoomCode(normalized)) {
+        window.localStorage.setItem(LAST_CODE_KEY, normalized);
       }
     } catch (err) {
       // Ignore storage failures.
@@ -108,7 +113,7 @@
       return 'Enter a room code to continue.';
     }
     if (!isValidRoomCode(code)) {
-      return 'Use lowercase letters, numbers, and single hyphen (start with a letter).';
+      return 'Use lowercase letters, numbers, and single hyphen (no leading, trailing, or double hyphen).';
     }
     return '';
   }

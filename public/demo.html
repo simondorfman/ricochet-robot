@@ -143,7 +143,7 @@
       <form id="join-form">
         <label>
           Room code
-          <input id="room-code" type="text" required minlength="1" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <input id="room-code" type="text" required minlength="1" maxlength="32" pattern="^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$" autocomplete="off" autocapitalize="off" spellcheck="false">
         </label>
         <label>
           Display name
@@ -329,6 +329,17 @@
       const nextRoundButton = document.getElementById('next-round');
       const nextMessage = document.getElementById('next-message');
 
+      const ROOM_CODE_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
+      const DOUBLE_HYPHEN_PATTERN = /--/;
+
+      function isValidRoomCode(value) {
+        const normalized = normalizeRoomCode(value);
+        if (!normalized) {
+          return false;
+        }
+        return ROOM_CODE_PATTERN.test(normalized) && !DOUBLE_HYPHEN_PATTERN.test(normalized);
+      }
+
       const searchParams = new URLSearchParams(window.location.search);
       let shouldShowShareBanner = searchParams.get('created') === '1';
       let shareBannerDisplayed = false;
@@ -336,7 +347,8 @@
       let storedPlayerInfo = null;
       let autoJoinContext = null;
       const pathRoomMatch = window.location.pathname.match(/^\/r\/([^/]+)/i);
-      const initialRoomCode = pathRoomMatch ? normalizeRoomCode(decodeURIComponent(pathRoomMatch[1])) : '';
+      const matchedRoomCode = pathRoomMatch ? normalizeRoomCode(decodeURIComponent(pathRoomMatch[1])) : '';
+      const initialRoomCode = matchedRoomCode && isValidRoomCode(matchedRoomCode) ? matchedRoomCode : '';
       if (initialRoomCode) {
         roomCodeInput.value = initialRoomCode;
         roomCodeInput.readOnly = true;
@@ -345,10 +357,16 @@
         updateJoinGateRoom(initialRoomCode);
       }
 
-      if (!storedPlayerInfo && roomCodeInput.value) {
-        storedPlayerInfo = loadStoredPlayer(roomCodeInput.value);
-        if (!initialRoomCode) {
-          updateJoinGateRoom(roomCodeInput.value);
+      if (!storedPlayerInfo && roomCodeInput && roomCodeInput.value) {
+        const inputRoomCode = normalizeRoomCode(roomCodeInput.value);
+        if (inputRoomCode && isValidRoomCode(inputRoomCode)) {
+          storedPlayerInfo = loadStoredPlayer(inputRoomCode);
+          if (!initialRoomCode) {
+            roomCodeInput.value = inputRoomCode;
+            updateJoinGateRoom(inputRoomCode);
+          }
+        } else if (!initialRoomCode) {
+          updateJoinGateRoom('');
         }
       }
 
@@ -631,7 +649,7 @@
           return;
         }
         const normalized = normalizeRoomCode(code);
-        if (!normalized) {
+        if (!normalized || !ROOM_CODE_PATTERN.test(normalized) || DOUBLE_HYPHEN_PATTERN.test(normalized)) {
           joinGateRoom.textContent = '';
           joinGateRoom.hidden = true;
           return;
@@ -649,11 +667,11 @@
 
       function getShareUrl(code) {
         const normalized = normalizeRoomCode(code);
-        if (!normalized) {
-          return window.location.href;
+        if (!normalized || !ROOM_CODE_PATTERN.test(normalized) || DOUBLE_HYPHEN_PATTERN.test(normalized)) {
+          return '';
         }
         const base = `${window.location.protocol}//${window.location.host}`;
-        return `${base}/r/${encodeURIComponent(normalized.toLowerCase())}`;
+        return `${base}/r/${encodeURIComponent(normalized)}`;
       }
 
       function consumeCreationFlag() {
@@ -677,6 +695,9 @@
           return;
         }
         const shareUrl = getShareUrl(code);
+        if (!shareUrl) {
+          return;
+        }
         if (shareLink) {
           shareLink.href = shareUrl;
           shareLink.textContent = shareUrl;
@@ -820,14 +841,11 @@
       }
 
       function storagePrefixForRoom(code) {
-        if (typeof code !== 'string') {
+        const normalized = normalizeRoomCode(code);
+        if (!normalized || !ROOM_CODE_PATTERN.test(normalized) || DOUBLE_HYPHEN_PATTERN.test(normalized)) {
           return null;
         }
-        const trimmed = code.trim();
-        if (!trimmed) {
-          return null;
-        }
-        return `rr.${trimmed.toLowerCase()}`;
+        return `rr.${normalized}`;
       }
 
       function loadStoredPlayer(code) {
@@ -1408,7 +1426,7 @@
         const auto = Boolean(options && options.auto);
         const showToastOnSuccess = !(options && options.showToast === false);
 
-        if (!normalizedCode || !sanitizedName || !canonicalColor) {
+        if (!normalizedCode || !isValidRoomCode(normalizedCode) || !sanitizedName || !canonicalColor) {
           if (!auto && joinForm && !joinForm.hidden) {
             setJoinFormDisabled(false);
           }
@@ -1542,6 +1560,10 @@
           setMessage(joinMessage, 'Enter a room code to join.', true);
           return;
         }
+        if (!isValidRoomCode(code)) {
+          setMessage(joinMessage, 'Room codes use lowercase letters, numbers, and single hyphen (no leading, trailing, or double hyphen).', true);
+          return;
+        }
         if (!displayName) {
           setMessage(joinMessage, 'Enter a display name.', true);
           return;
@@ -1552,6 +1574,7 @@
           return;
         }
 
+        roomCodeInput.value = code;
         playerNameInput.value = displayName;
         setMessage(joinMessage, 'Joining…', false);
         setJoinFormDisabled(true);
@@ -2236,7 +2259,7 @@
 
       async function ensureRoomCreated(code) {
         const normalized = normalizeRoomCode(code);
-        if (!normalized) {
+        if (!normalized || !ROOM_CODE_PATTERN.test(normalized) || DOUBLE_HYPHEN_PATTERN.test(normalized)) {
           throw new Error('Room code is required.');
         }
         const res = await fetch(`/api/rooms/${encodeURIComponent(normalized)}/create`, {
@@ -2264,6 +2287,9 @@
 
       async function joinRoomOnServer(code, displayName, color) {
         const normalized = normalizeRoomCode(code);
+        if (!normalized || !ROOM_CODE_PATTERN.test(normalized) || DOUBLE_HYPHEN_PATTERN.test(normalized)) {
+          throw new Error('Room code is required.');
+        }
         const url = `/api/rooms/${encodeURIComponent(normalized)}/players/join`;
         try {
           return await postJson(url, { displayName: displayName, color: color });
@@ -2278,6 +2304,9 @@
 
       async function updatePlayerOnServer(code, playerId, displayName, color) {
         const normalized = normalizeRoomCode(code);
+        if (!normalized || !ROOM_CODE_PATTERN.test(normalized) || DOUBLE_HYPHEN_PATTERN.test(normalized)) {
+          throw new Error('Room code is required.');
+        }
         const body = { playerId: Number(playerId) };
         if (typeof displayName === 'string') {
           body.displayName = displayName;
@@ -2290,8 +2319,8 @@
 
       async function joinOrUpdatePlayer(code, displayName, color) {
         const normalized = normalizeRoomCode(code);
-        if (!normalized) {
-          throw new Error('Room code is required.');
+        if (!normalized || !ROOM_CODE_PATTERN.test(normalized) || DOUBLE_HYPHEN_PATTERN.test(normalized)) {
+          throw new Error('Enter a valid room code.');
         }
         const trimmedName = displayName.trim();
         if (!trimmedName) {
@@ -2331,6 +2360,9 @@
 
       async function claimHostOnServer(code, playerId) {
         const normalized = normalizeRoomCode(code);
+        if (!normalized || !ROOM_CODE_PATTERN.test(normalized) || DOUBLE_HYPHEN_PATTERN.test(normalized)) {
+          throw new Error('Room code is required.');
+        }
         return await postJson(`/api/rooms/${encodeURIComponent(normalized)}/players/claim-host`, { playerId: Number(playerId) });
       }
     }());

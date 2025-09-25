@@ -184,9 +184,9 @@
       <form id="create-room-form" novalidate>
         <label for="create-room-code">
           Room code
-          <input id="create-room-code" name="code" type="text" maxlength="32" pattern="^[a-z][a-z0-9-]{1,31}$" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+          <input id="create-room-code" name="code" type="text" maxlength="32" pattern="^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$" autocomplete="off" autocapitalize="none" spellcheck="false" required>
         </label>
-        <p class="input-hint">Use lowercase letters, numbers, and hyphen. Start with a letter, 2–32 characters.</p>
+        <p class="input-hint">Use lowercase letters, numbers, and hyphen. No leading, trailing, or double hyphen (max 32 characters).</p>
         <div class="actions">
           <button type="submit" class="primary" id="create-room-submit">Create room</button>
           <button type="button" class="secondary" id="generate-room-code">New suggestion</button>
@@ -198,7 +198,7 @@
       <form id="join-room-form" novalidate>
         <label for="join-room-code">
           Room code
-          <input id="join-room-code" name="code" type="text" maxlength="32" pattern="^[a-z][a-z0-9-]{1,31}$" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+          <input id="join-room-code" name="code" type="text" maxlength="32" pattern="^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$" autocomplete="off" autocapitalize="none" spellcheck="false" required>
         </label>
         <p class="input-hint">Enter the code shared by the room creator.</p>
         <div class="actions">
