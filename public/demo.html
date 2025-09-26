@@ -33,6 +33,7 @@
     .join-gate button[type="submit"] { margin-top: 0.25rem; }
     .join-gate__status { margin-top: 0.75rem; }
     .share-banner { margin-bottom: 1.25rem; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid #facc15; background: #fef3c7; color: #92400e; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .share-banner.hidden { display: none !important; }
     .share-banner__text { font-weight: 600; }
     .share-banner__link { font-weight: 600; color: inherit; word-break: break-word; text-decoration: none; }
     .share-banner__link:focus-visible, .share-banner__link:hover { text-decoration: underline; }
@@ -54,7 +55,15 @@
     #verifying-queue li.empty { list-style: none; font-style: italic; color: #555; }
     .verify-buttons { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     .board-wrapper { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
-    #board { --cell-count: 16; background: #fff; border: 2px solid #d0d5dd; border-radius: 10px; flex: 1 1 320px; max-width: 480px; padding: 0.5rem; outline: none; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
+    .game-layout { display: flex; gap: 1.5rem; min-height: 100vh; }
+    .game-column { flex: 1; display: flex; flex-direction: column; gap: 1.5rem; }
+    .game-column-left { max-width: 50%; }
+    .game-column-right { max-width: 50%; }
+    @media (max-width: 1024px) {
+      .game-layout { flex-direction: column; }
+      .game-column-left, .game-column-right { max-width: 100%; }
+    }
+    #board { --cell-count: 16; background: #fff; border: 2px solid #d0d5dd; border-radius: 10px; width: 100%; max-width: 100%; padding: 0.5rem; outline: none; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
     #board:focus-visible { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.35), 0 10px 30px rgba(15, 23, 42, 0.1); }
     .board.is-focused { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25), 0 10px 30px rgba(15, 23, 42, 0.1); }
     .board-surface { position: relative; width: 100%; padding-bottom: 100%; }
@@ -183,115 +192,115 @@
         <button type="button" id="share-dismiss" class="share-banner__dismiss" aria-label="Dismiss banner">✕</button>
       </div>
     </div>
-    <h1>Ricochet Robot Bidding Demo</h1>
-    <p>Use this page to experiment with the server-authoritative bidding timer. Join the same room code in two tabs to observe live updates.</p>
-    <div class="join-actions">
-      <button type="button" id="edit-identity" class="secondary" hidden>Change identity</button>
-    </div>
 
-    <fieldset id="players-fieldset" hidden>
-    <legend>Players</legend>
-    <div class="players-header">
-      <div><strong id="player-count">0</strong> joined</div>
-      <div id="host-status" class="host-status" aria-live="polite"></div>
-    </div>
-    <ul id="players-list" class="players-list"></ul>
-    <button type="button" id="claim-host" class="secondary" hidden>Claim Host</button>
-  </fieldset>
+    <div class="game-layout">
+      <!-- Column A: Board and Controls -->
+      <div class="game-column game-column-left">
+        <fieldset>
+          <legend>Board</legend>
+          <div id="board" class="board" tabindex="0" aria-label="Ricochet Robot board">
+            <div class="board-surface">
+              <div id="board-grid" class="board-grid" aria-hidden="true"></div>
+              <div id="robot-layer" class="robot-layer" aria-hidden="true"></div>
+            </div>
+          </div>
+        </fieldset>
 
-  <fieldset>
-    <legend>Current Round</legend>
-    <div class="status">
-      Status: <span id="status">—</span> (state version <span id="state-version">0</span>)
-    </div>
-    <div class="timer">
-      Time Remaining: <span id="remaining">—</span>
-    </div>
-    <div>
-      Lowest Bid: <span id="low-bid">—</span>
-      <span id="low-bidder"></span>
-    </div>
-    <div id="leading-info" class="leading-panel" hidden>
-      <strong>Leading:</strong>
-      <span id="leading-text"></span>
-    </div>
-    <div id="verifying-container" class="verifying-panel" hidden>
-      <h3>Verification Queue</h3>
-      <div id="verifying-current">Current: —</div>
-      <ol id="verifying-queue"></ol>
-      <div class="verify-buttons">
-        <button type="button" id="verify-pass">Pass</button>
-        <button type="button" id="verify-fail">Fail</button>
-        <span id="verify-message" class="message" aria-live="polite"></span>
+        <fieldset>
+          <legend>Controls</legend>
+          <div id="board-selection" class="board-selection" aria-live="polite">Selected robot: —</div>
+          <div id="robot-badges" class="robot-badges" role="group" aria-label="Select robot"></div>
+          <div id="arrow-controls" class="arrow-controls" role="group" aria-label="Move robot">
+            <button type="button" class="arrow-button arrow-up" data-dir="UP" aria-label="Move up">↑</button>
+            <button type="button" class="arrow-button arrow-left" data-dir="LEFT" aria-label="Move left">←</button>
+            <button type="button" class="arrow-button arrow-right" data-dir="RIGHT" aria-label="Move right">→</button>
+            <button type="button" class="arrow-button arrow-down" data-dir="DOWN" aria-label="Move down">↓</button>
+          </div>
+          <details class="board-help" open>
+            <summary>Keyboard tips</summary>
+            <ul>
+              <li><strong>Bid:</strong> Type digits, press Enter</li>
+              <li><strong>Select robot:</strong> Tab / Shift+Tab or click a badge</li>
+              <li><strong>Move:</strong> Arrow keys or W/A/S/D</li>
+              <li><strong>Clear bid:</strong> Esc</li>
+            </ul>
+          </details>
+        </fieldset>
+      </div>
+
+      <!-- Column B: Players, Bids, and Game Info -->
+      <div class="game-column game-column-right">
+        <fieldset id="players-fieldset" hidden>
+          <legend>Players & Leaderboard</legend>
+          <div class="players-header">
+            <div><strong id="player-count">0</strong> joined</div>
+            <div id="host-status" class="host-status" aria-live="polite"></div>
+          </div>
+          <ul id="players-list" class="players-list"></ul>
+          <button type="button" id="claim-host" class="secondary" hidden>Claim Host</button>
+          
+          <h3>Leaderboard</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Tokens</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard"></tbody>
+          </table>
+        </fieldset>
+
+        <fieldset>
+          <legend>Recent Bids</legend>
+          <ul id="bids"></ul>
+        </fieldset>
+
+        <fieldset>
+          <legend>Submit Bid</legend>
+          <form id="bid-form">
+            <label>
+              Bid value
+              <input id="bidInput" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
+            </label>
+            <button type="submit">Submit Bid</button>
+            <span id="bid-message" class="message" aria-live="polite"></span>
+          </form>
+        </fieldset>
+
+        <fieldset>
+          <legend>Current Round</legend>
+          <div class="status">
+            Status: <span id="status">—</span> (state version <span id="state-version">0</span>)
+          </div>
+          <div class="timer">
+            Time Remaining: <span id="remaining">—</span>
+          </div>
+          <div>
+            Lowest Bid: <span id="low-bid">—</span>
+            <span id="low-bidder"></span>
+          </div>
+          <div id="leading-info" class="leading-panel" hidden>
+            <strong>Leading:</strong>
+            <span id="leading-text"></span>
+          </div>
+          <div id="verifying-container" class="verifying-panel" hidden>
+            <h3>Verification Queue</h3>
+            <div id="verifying-current">Current: —</div>
+            <ol id="verifying-queue"></ol>
+            <div class="verify-buttons">
+              <button type="button" id="verify-pass">Pass</button>
+              <button type="button" id="verify-fail">Fail</button>
+              <span id="verify-message" class="message" aria-live="polite"></span>
+            </div>
+          </div>
+          <div id="host-controls" class="host-controls" hidden>
+            <button type="button" id="next-round" class="secondary">Next Round</button>
+            <span id="next-message" class="message" aria-live="polite"></span>
+          </div>
+        </fieldset>
       </div>
     </div>
-    <div id="host-controls" class="host-controls" hidden>
-      <button type="button" id="next-round" class="secondary">Next Round</button>
-      <span id="next-message" class="message" aria-live="polite"></span>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Board &amp; Controls</legend>
-    <div class="board-wrapper">
-      <div id="board" class="board" tabindex="0" aria-label="Ricochet Robot board">
-        <div class="board-surface">
-          <div id="board-grid" class="board-grid" aria-hidden="true"></div>
-          <div id="robot-layer" class="robot-layer" aria-hidden="true"></div>
-        </div>
-      </div>
-      <div class="board-sidebar">
-        <div id="board-selection" class="board-selection" aria-live="polite">Selected robot: —</div>
-        <div id="robot-badges" class="robot-badges" role="group" aria-label="Select robot"></div>
-        <div id="arrow-controls" class="arrow-controls" role="group" aria-label="Move robot">
-          <button type="button" class="arrow-button arrow-up" data-dir="UP" aria-label="Move up">↑</button>
-          <button type="button" class="arrow-button arrow-left" data-dir="LEFT" aria-label="Move left">←</button>
-          <button type="button" class="arrow-button arrow-right" data-dir="RIGHT" aria-label="Move right">→</button>
-          <button type="button" class="arrow-button arrow-down" data-dir="DOWN" aria-label="Move down">↓</button>
-        </div>
-        <details class="board-help" open>
-          <summary>Keyboard tips</summary>
-          <ul>
-            <li><strong>Bid:</strong> Type digits, press Enter</li>
-            <li><strong>Select robot:</strong> Tab / Shift+Tab or click a badge</li>
-            <li><strong>Move:</strong> Arrow keys or W/A/S/D</li>
-            <li><strong>Clear bid:</strong> Esc</li>
-          </ul>
-        </details>
-      </div>
-    </div>
-  </fieldset>
-
-  <div class="columns">
-    <div>
-      <h2>Recent Bids</h2>
-      <ul id="bids"></ul>
-    </div>
-    <div>
-      <h2>Leaderboard</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Player</th>
-            <th>Tokens</th>
-          </tr>
-        </thead>
-        <tbody id="leaderboard"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <fieldset>
-    <legend>Submit Bid</legend>
-    <form id="bid-form">
-      <label>
-        Bid value
-        <input id="bidInput" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
-      </label>
-      <button type="submit">Submit Bid</button>
-      <span id="bid-message" class="message" aria-live="polite"></span>
-    </form>
-  </fieldset>
 
   </div>
 
@@ -311,6 +320,7 @@
       const shareLink = document.getElementById('share-link');
       const shareCopyButton = document.getElementById('share-copy');
       const shareDismissButton = document.getElementById('share-dismiss');
+      console.log('shareDismissButton found:', !!shareDismissButton);
       const roomCodeInput = document.getElementById('room-code');
       const playerNameInput = document.getElementById('player-name');
       const playerColorInput = document.getElementById('player-color');
@@ -346,6 +356,7 @@
       const searchParams = new URLSearchParams(window.location.search);
       let shouldShowShareBanner = searchParams.get('created') === '1';
       let shareBannerDisplayed = false;
+      let userDismissedBanner = false;
 
       let storedPlayerInfo = null;
       let autoJoinContext = null;
@@ -707,27 +718,43 @@
       }
 
       function maybeShowShareBanner(code) {
-        if (!shareBanner || shareBannerDisplayed || !shouldShowShareBanner) {
+        console.log('maybeShowShareBanner called with:', { code, shareBanner: !!shareBanner, shareBannerDisplayed, shouldShowShareBanner, userDismissedBanner });
+        if (!shareBanner || shareBannerDisplayed || !shouldShowShareBanner || userDismissedBanner) {
+          console.log('maybeShowShareBanner: not showing banner, conditions:', { shareBanner: !!shareBanner, shareBannerDisplayed, shouldShowShareBanner, userDismissedBanner });
           return;
         }
         const shareUrl = getShareUrl(code);
         if (!shareUrl) {
+          console.log('maybeShowShareBanner: no share URL');
           return;
         }
+        console.log('maybeShowShareBanner: showing banner with URL:', shareUrl);
         if (shareLink) {
           shareLink.href = shareUrl;
           shareLink.textContent = shareUrl;
         }
+        shareBanner.classList.remove('hidden');
         shareBanner.hidden = false;
+        shareBanner.style.display = ''; // Safari fallback - remove inline style
+        shareBanner.removeAttribute('aria-hidden');
         shareBannerDisplayed = true;
         consumeCreationFlag();
       }
 
       function hideShareBanner() {
+        console.log('hideShareBanner called');
         if (shareBanner) {
+          console.log('Hiding share banner');
+          shareBanner.classList.add('hidden');
           shareBanner.hidden = true;
+          shareBanner.style.display = 'none'; // Safari fallback
+          shareBanner.setAttribute('aria-hidden', 'true');
+        } else {
+          console.log('shareBanner element not found');
         }
         shareBannerDisplayed = false;
+        shouldShowShareBanner = false; // Prevent re-showing
+        userDismissedBanner = true; // Mark that user manually dismissed
         consumeCreationFlag();
       }
 
@@ -1664,6 +1691,7 @@
 
       if (shareDismissButton) {
         shareDismissButton.addEventListener('click', function () {
+          console.log('Share dismiss button clicked');
           hideShareBanner();
         });
       }
