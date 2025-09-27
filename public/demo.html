@@ -7,7 +7,7 @@
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2rem; background: #f7f7f7; }
     h1 { margin-bottom: 0.5rem; }
-    fieldset { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1.5rem; background: #fff; }
+    fieldset { border: 1px solid #ccc; padding: 0.75rem; margin-bottom: 0.75rem; background: #fff; }
     label { display: block; margin-bottom: 0.5rem; }
     input, select, button { padding: 0.5rem; font-size: 1rem; }
     .status { font-size: 1.25rem; margin: 0.5rem 0; }
@@ -56,7 +56,7 @@
     .verify-buttons { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     .board-wrapper { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
     .game-layout { display: flex; gap: 1.5rem; min-height: 100vh; }
-    .game-column { flex: 1; display: flex; flex-direction: column; gap: 1.5rem; }
+    .game-column { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; }
     .game-column-left { max-width: 50%; }
     .game-column-right { max-width: 50%; }
     @media (max-width: 1024px) {
@@ -104,26 +104,20 @@
     .color-preview { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 1px solid #d1d5db; background: #f3f4f6; display: inline-block; }
     .banner { margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #facc15; background: #fef3c7; color: #92400e; font-size: 0.95rem; }
     .join-actions { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-    .players-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
-    .players-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-    .player-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; }
-    .player-row.is-self { border-color: #2563eb; box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35); }
-    .player-info { display: flex; align-items: center; gap: 0.5rem; }
-    .player-name { font-weight: 600; }
-    .player-tokens { font-size: 0.9rem; color: #4b5563; min-width: 2.5rem; text-align: right; }
-    .host-status { font-weight: 600; color: #2563eb; }
-    .host-status.is-self { color: #15803d; }
-    .player-role { font-size: 0.8rem; font-weight: 600; color: #1d4ed8; }
+    .players-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
     button.secondary { padding: 0.5rem 0.9rem; font-weight: 600; border-radius: 6px; border: 1px solid #2563eb; background: #fff; color: #2563eb; cursor: pointer; transition: background 120ms ease, color 120ms ease; }
     button.secondary:hover, button.secondary:focus-visible { background: #eff6ff; color: #1d4ed8; }
-    .host-controls { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
-    .board-help { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.95rem; }
+    .host-controls { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .controls-layout { display: flex; gap: 1rem; align-items: flex-start; }
+    .controls-main { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; }
+    .controls-help { flex: 0 0 200px; }
+    .board-help { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.9rem; }
     .board-help summary { font-weight: 600; cursor: pointer; list-style: none; }
     .board-help summary::-webkit-details-marker { display: none; }
     .board-help summary::after { content: '⌄'; float: right; transform: rotate(0deg); transition: transform 120ms ease; }
     .board-help[open] summary::after { transform: rotate(180deg); }
-    .board-help ul { margin: 0.75rem 0 0; padding-left: 1.25rem; }
-    .board-help li { margin-bottom: 0.35rem; }
+    .board-help ul { margin: 0.5rem 0 0; padding-left: 1rem; }
+    .board-help li { margin-bottom: 0.25rem; }
     .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(16px); background: #111827; color: #fff; padding: 0.75rem 1.25rem; border-radius: 999px; box-shadow: 0 16px 32px rgba(15, 23, 42, 0.2); opacity: 0; pointer-events: none; transition: opacity 150ms ease, transform 150ms ease; z-index: 1000; font-weight: 600; }
     .toast.toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
     .toast.toast--error { background: #b91c1c; }
@@ -138,6 +132,8 @@
       .arrow-controls { grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); }
       .arrow-button { font-size: 1rem; }
       .robot { font-size: 0.85rem; }
+      .controls-layout { flex-direction: column; }
+      .controls-help { flex: none; }
     }
   </style>
   <script src="/public/js/polling.js" defer></script>
@@ -174,66 +170,23 @@
     </div>
 
     <div class="game-layout">
-      <!-- Column A: Board and Controls -->
+      <!-- Column A: Players, Bids, and Game Info -->
       <div class="game-column game-column-left">
-        <fieldset>
-          <legend>Board</legend>
-          <div id="board" class="board" tabindex="0" aria-label="Ricochet Robot board">
-            <div class="board-surface">
-              <div id="board-grid" class="board-grid" aria-hidden="true"></div>
-              <div id="robot-layer" class="robot-layer" aria-hidden="true"></div>
-            </div>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Controls</legend>
-          <div id="board-selection" class="board-selection" aria-live="polite">Selected robot: —</div>
-          <div id="robot-badges" class="robot-badges" role="group" aria-label="Select robot"></div>
-          <div id="arrow-controls" class="arrow-controls" role="group" aria-label="Move robot">
-            <button type="button" class="arrow-button arrow-up" data-dir="UP" aria-label="Move up">↑</button>
-            <button type="button" class="arrow-button arrow-left" data-dir="LEFT" aria-label="Move left">←</button>
-            <button type="button" class="arrow-button arrow-right" data-dir="RIGHT" aria-label="Move right">→</button>
-            <button type="button" class="arrow-button arrow-down" data-dir="DOWN" aria-label="Move down">↓</button>
-          </div>
-          <details class="board-help" open>
-            <summary>Keyboard tips</summary>
-            <ul>
-              <li><strong>Bid:</strong> Type digits, press Enter</li>
-              <li><strong>Select robot:</strong> Tab / Shift+Tab or click a badge</li>
-              <li><strong>Move:</strong> Arrow keys or W/A/S/D</li>
-              <li><strong>Clear bid:</strong> Esc</li>
-            </ul>
-          </details>
-        </fieldset>
-      </div>
-
-      <!-- Column B: Players, Bids, and Game Info -->
-      <div class="game-column game-column-right">
         <fieldset id="players-fieldset" hidden>
-          <legend>Players & Leaderboard</legend>
+          <legend>Leaderboard</legend>
           <div class="players-header">
-            <div><strong id="player-count">0</strong> joined</div>
-            <div id="host-status" class="host-status" aria-live="polite"></div>
+            <button type="button" id="claim-host" class="secondary" hidden>Claim Host</button>
           </div>
-          <ul id="players-list" class="players-list"></ul>
-          <button type="button" id="claim-host" class="secondary" hidden>Claim Host</button>
-          
-          <h3>Leaderboard</h3>
           <table>
             <thead>
               <tr>
                 <th>Player</th>
+                <th>Bid</th>
                 <th>Tokens</th>
               </tr>
             </thead>
             <tbody id="leaderboard"></tbody>
           </table>
-        </fieldset>
-
-        <fieldset>
-          <legend>Recent Bids</legend>
-          <ul id="bids"></ul>
         </fieldset>
 
         <fieldset>
@@ -246,6 +199,33 @@
             <button type="submit">Submit Bid</button>
             <span id="bid-message" class="message" aria-live="polite"></span>
           </form>
+        </fieldset>
+
+        <fieldset>
+          <legend>Controls</legend>
+          <div class="controls-layout">
+            <div class="controls-main">
+              <div id="board-selection" class="board-selection" aria-live="polite">Selected robot: —</div>
+              <div id="robot-badges" class="robot-badges" role="group" aria-label="Select robot"></div>
+              <div id="arrow-controls" class="arrow-controls" role="group" aria-label="Move robot">
+                <button type="button" class="arrow-button arrow-up" data-dir="UP" aria-label="Move up">↑</button>
+                <button type="button" class="arrow-button arrow-left" data-dir="LEFT" aria-label="Move left">←</button>
+                <button type="button" class="arrow-button arrow-right" data-dir="RIGHT" aria-label="Move right">→</button>
+                <button type="button" class="arrow-button arrow-down" data-dir="DOWN" aria-label="Move down">↓</button>
+              </div>
+            </div>
+            <div class="controls-help">
+              <details class="board-help" open>
+                <summary>Keyboard tips</summary>
+                <ul>
+                  <li><strong>Bid:</strong> Type digits, press Enter</li>
+                  <li><strong>Select robot:</strong> Tab / Shift+Tab or click a badge</li>
+                  <li><strong>Move:</strong> Arrow keys or W/A/S/D</li>
+                  <li><strong>Clear bid:</strong> Esc</li>
+                </ul>
+              </details>
+            </div>
+          </div>
         </fieldset>
 
         <fieldset>
@@ -280,6 +260,19 @@
           </div>
         </fieldset>
       </div>
+
+      <!-- Column B: Board -->
+      <div class="game-column game-column-right">
+        <fieldset>
+          <legend>Board</legend>
+          <div id="board" class="board" tabindex="0" aria-label="Ricochet Robot board">
+            <div class="board-surface">
+              <div id="board-grid" class="board-grid" aria-hidden="true"></div>
+              <div id="robot-layer" class="robot-layer" aria-hidden="true"></div>
+            </div>
+          </div>
+        </fieldset>
+      </div>
     </div>
 
   </div>
@@ -290,6 +283,8 @@
     (function () {
       console.log('Script starting, checking PollingHelpers availability');
       console.log('PollingHelpers available:', !!window.PollingHelpers);
+      console.log('Current URL:', window.location.href);
+      console.log('Search params:', window.location.search);
       
       const joinForm = document.getElementById('join-form');
       const bidForm = document.getElementById('bid-form');
@@ -312,9 +307,6 @@
       const editIdentityButton = document.getElementById('edit-identity');
       const bidInput = document.getElementById('bidInput');
       const playersFieldset = document.getElementById('players-fieldset');
-      const playersListEl = document.getElementById('players-list');
-      const playerCountEl = document.getElementById('player-count');
-      const hostStatusEl = document.getElementById('host-status');
       const claimHostButton = document.getElementById('claim-host');
       const hostControls = document.getElementById('host-controls');
       const nextRoundButton = document.getElementById('next-round');
@@ -388,10 +380,12 @@
 
 
       if (autoJoinContext) {
+        console.log('Auto-join context found:', autoJoinContext);
         setJoinFormVisible(false);
         setEditIdentityVisible(false);
         showJoinStatusBanner(`Rejoining as ${formatIdentityLabel(autoJoinContext.displayName, autoJoinContext.color)}…`);
       } else {
+        console.log('No auto-join context found, showing join form');
         setJoinFormVisible(true);
         setEditIdentityVisible(false);
         hideJoinStatusBanner();
@@ -404,7 +398,6 @@
       const lowBidderEl = document.getElementById('low-bidder');
       const leadingPanel = document.getElementById('leading-info');
       const leadingText = document.getElementById('leading-text');
-      const bidsEl = document.getElementById('bids');
       const leaderboardEl = document.getElementById('leaderboard');
       const verifyingContainer = document.getElementById('verifying-container');
       const verifyingCurrent = document.getElementById('verifying-current');
@@ -1025,89 +1018,15 @@
         return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}`;
       }
 
-      function renderPlayersList() {
-        if (!playersFieldset || !playersListEl || !playerCountEl) {
+      function updatePlayerInfo() {
+        if (!playersFieldset) {
           return;
         }
 
         const entries = Object.values(playersById || {});
         const hasPlayers = entries.length > 0;
         playersFieldset.hidden = !hasPlayers && !currentRoomCode;
-        playersListEl.innerHTML = '';
-        playerCountEl.textContent = String(entries.length);
 
-        if (!hasPlayers) {
-          if (hostStatusEl) {
-            hostStatusEl.textContent = 'No host yet.';
-            hostStatusEl.classList.remove('is-self');
-          }
-          if (claimHostButton) {
-            claimHostButton.hidden = true;
-          }
-          return;
-        }
-
-        const sorted = entries.slice().sort(function (a, b) {
-          const tokensA = Number.isFinite(a.tokensWon) ? a.tokensWon : 0;
-          const tokensB = Number.isFinite(b.tokensWon) ? b.tokensWon : 0;
-          if (tokensB !== tokensA) {
-            return tokensB - tokensA;
-          }
-          const nameA = (a.displayName || '').toLowerCase();
-          const nameB = (b.displayName || '').toLowerCase();
-          if (nameA !== nameB) {
-            return nameA < nameB ? -1 : 1;
-          }
-          return a.playerId - b.playerId;
-        });
-
-        sorted.forEach(function (entry) {
-          const li = document.createElement('li');
-          li.className = 'player-row';
-          if (entry.playerId === currentPlayerId) {
-            li.classList.add('is-self');
-          }
-
-          const infoWrap = document.createElement('div');
-          infoWrap.className = 'player-info';
-
-          const nameSpan = document.createElement('span');
-          nameSpan.className = 'player-name';
-          nameSpan.textContent = entry.displayName || `Player ${entry.playerId}`;
-          infoWrap.appendChild(nameSpan);
-
-          if (hostPlayerId != null && entry.playerId === hostPlayerId) {
-            const roleSpan = document.createElement('span');
-            roleSpan.className = 'player-role';
-            roleSpan.textContent = 'Host';
-            infoWrap.appendChild(roleSpan);
-          }
-
-          li.appendChild(infoWrap);
-
-          const tokensSpan = document.createElement('span');
-          tokensSpan.className = 'player-tokens';
-          const tokens = Number.isFinite(entry.tokensWon) ? entry.tokensWon : 0;
-          tokensSpan.textContent = `${tokens} token${tokens === 1 ? '' : 's'}`;
-          li.appendChild(tokensSpan);
-
-          playersListEl.appendChild(li);
-        });
-
-        if (hostStatusEl) {
-          if (hostPlayerId != null) {
-            if (currentPlayerId === hostPlayerId) {
-              hostStatusEl.textContent = 'You are the host.';
-              hostStatusEl.classList.add('is-self');
-            } else {
-              hostStatusEl.textContent = `Host: ${formatPlayerLabel(hostPlayerId)}`;
-              hostStatusEl.classList.remove('is-self');
-            }
-          } else {
-            hostStatusEl.textContent = 'No host yet.';
-            hostStatusEl.classList.remove('is-self');
-          }
-        }
 
         if (claimHostButton) {
           const canClaim = hostPlayerId == null && currentPlayerId != null;
@@ -1158,7 +1077,7 @@
             currentPlayerName = selfInfo.displayName;
           }
         }
-        renderPlayersList();
+        updatePlayerInfo();
         lowBidEl.textContent = state.currentLow != null ? state.currentLow : '—';
         lowBidderEl.textContent = state.currentLowBy != null ? `(by ${formatPlayerLabel(state.currentLowBy)})` : '';
 
@@ -1167,34 +1086,31 @@
         const ties = Array.isArray(state.tiesAtCurrentLow) ? state.tiesAtCurrentLow : [];
         const tieCount = ties.length;
 
-        bidsEl.innerHTML = '';
-        let leaderMarked = false;
-        (state.bids || []).forEach(function (bid) {
-          const li = document.createElement('li');
-          const when = bid.createdAt ? new Date(bid.createdAt).toLocaleTimeString() : '—';
-          const label = formatPlayerLabel(bid.playerId);
-          let text = `${label} bid ${bid.value} @ ${when}`;
-
-          if (currentLow != null && bid.value === currentLow) {
-            li.classList.add('bid-tie');
-            if (leader && !leaderMarked && leader.playerId === bid.playerId && leader.value === bid.value) {
-              li.classList.add('bid-leading');
-              text += ' (leading)';
-              leaderMarked = true;
-            } else if (tieCount > 1) {
-              text += ' (tied)';
-            }
-          }
-
-          li.textContent = text;
-          bidsEl.appendChild(li);
-        });
 
         leaderboardEl.innerHTML = '';
         (state.leaderboard || []).forEach(function (row) {
           const tr = document.createElement('tr');
           const nameCell = document.createElement('td');
-          nameCell.textContent = formatPlayerLabel(row.playerId);
+          let playerName = formatPlayerLabel(row.playerId);
+          // Add "Host" indicator if this player is the host
+          if (hostPlayerId != null && row.playerId === hostPlayerId) {
+            playerName += ' (Host)';
+          }
+          nameCell.textContent = playerName;
+          
+          const bidCell = document.createElement('td');
+          // Find the current bid for this player
+          let currentBid = '—';
+          if (state.bids && Array.isArray(state.bids)) {
+            const playerBids = state.bids.filter(bid => bid.playerId === row.playerId);
+            if (playerBids.length > 0) {
+              // Get the most recent bid
+              const latestBid = playerBids[playerBids.length - 1];
+              currentBid = latestBid.value != null ? latestBid.value : '—';
+            }
+          }
+          bidCell.textContent = currentBid;
+          
           const tokensCell = document.createElement('td');
           let tokensValue = Number.isFinite(row.tokensWon) ? row.tokensWon : null;
           if (tokensValue == null) {
@@ -1202,7 +1118,9 @@
             tokensValue = info && Number.isFinite(info.tokensWon) ? info.tokensWon : 0;
           }
           tokensCell.textContent = tokensValue != null ? tokensValue : '0';
+          
           tr.appendChild(nameCell);
+          tr.appendChild(bidCell);
           tr.appendChild(tokensCell);
           leaderboardEl.appendChild(tr);
         });
@@ -1401,7 +1319,7 @@
               resetClientState();
               playersById = {};
               hostPlayerId = null;
-              renderPlayersList();
+              updatePlayerInfo();
               updateHostControls({ status: 'bidding' });
             }
 
@@ -1415,7 +1333,7 @@
                 color: 'Purple',
                 tokensWon: existingTokens
               };
-              renderPlayersList();
+              updatePlayerInfo();
               updateHostControls(lastStateSnapshot || { status: lastStateSnapshot ? lastStateSnapshot.status : 'bidding' });
             }
 
@@ -1581,24 +1499,31 @@
       }, 1000);
 
       if (autoJoinContext && !autoJoinScheduled) {
+        console.log('Starting auto-join process for:', autoJoinContext);
         autoJoinScheduled = true;
         whenPollingHelpersReady(function () {
+          console.log('PollingHelpers ready, executing auto-join');
           const autoName = typeof autoJoinContext.displayName === 'string'
             ? autoJoinContext.displayName.trim()
             : '';
           const autoColor = 'Purple'; // Default color
           if (!autoName) {
+            console.log('No auto name found, showing join form');
             setJoinFormVisible(true);
             setEditIdentityVisible(false);
             hideJoinStatusBanner();
             return;
           }
+          console.log('Running auto-join flow with:', { code: autoJoinContext.code, name: autoName, color: autoColor });
           runJoinFlow(autoJoinContext.code, autoName, autoColor, { auto: true });
         }, function () {
+          console.log('PollingHelpers timeout, showing join form');
           setJoinFormVisible(true);
           setEditIdentityVisible(false);
           hideJoinStatusBanner();
         });
+      } else {
+        console.log('No auto-join context or already scheduled');
       }
 
       bidForm.addEventListener('submit', function (event) {
@@ -1739,7 +1664,7 @@
           claimHostButton.disabled = true;
           claimHostOnServer(currentRoomCode, currentPlayerId).then(function () {
             hostPlayerId = currentPlayerId;
-            renderPlayersList();
+            updatePlayerInfo();
             updateHostControls(lastStateSnapshot || { status: lastStateSnapshot ? lastStateSnapshot.status : 'bidding' });
             showToast('You are now the host.', false);
           }).catch(function (err) {
@@ -1748,7 +1673,7 @@
             showToast(message, true);
           }).finally(function () {
             claimInFlight = false;
-            renderPlayersList();
+            updatePlayerInfo();
           });
         });
       }
