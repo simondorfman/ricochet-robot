@@ -90,6 +90,12 @@ try {
         respondJson(422, ['error' => $e->getMessage()]);
     }
 
+    // Bump state version to notify other players of the player update
+    $round = fetchCurrentRoundByRoomCode($code);
+    if ($round !== null) {
+        bumpVersion((int) $round['id']);
+    }
+
     $pdo->commit();
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {

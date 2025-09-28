@@ -78,6 +78,12 @@ try {
         ]);
     }
 
+    // Bump state version to notify other players of the new player
+    $round = fetchCurrentRoundByRoomCode($code);
+    if ($round !== null) {
+        bumpVersion((int) $round['id']);
+    }
+
     $pdo->commit();
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
