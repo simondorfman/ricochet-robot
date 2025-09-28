@@ -63,7 +63,7 @@
       .game-layout { flex-direction: column; }
       .game-column-left, .game-column-right { max-width: 100%; }
     }
-    #board { --cell-count: 16; background: #fff; border: 2px solid #d0d5dd; border-radius: 10px; width: 100%; max-width: 100%; padding: 0.5rem; outline: none; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
+    #board { --cell-count: 16; background: #fff; border: 2px solid #d0d5dd; border-radius: 10px; width: 100%; max-width: 100%; padding: 0; outline: none; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
     #board:focus-visible { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.35), 0 10px 30px rgba(15, 23, 42, 0.1); }
     .board.is-focused { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25), 0 10px 30px rgba(15, 23, 42, 0.1); }
     .board-surface { position: relative; width: 100%; padding-bottom: 100%; }
@@ -75,23 +75,30 @@
     .board-cell.wall-left { border-left-width: 4px; border-left-color: #1f2937; }
     .board-cell.wall-right { border-right-width: 4px; border-right-color: #1f2937; }
     .board-cell.is-selected::after { content: ''; position: absolute; inset: 3px; border-radius: 6px; border: 2px solid rgba(59, 130, 246, 0.8); pointer-events: none; }
+    .board-cell.center-cell { border: none; background: #1f2937; }
     .robot-layer { pointer-events: none; }
     .robot { pointer-events: auto; position: absolute; width: calc(100% / var(--cell-count) - 6px); height: calc(100% / var(--cell-count) - 6px); transform: translate(calc(var(--col) * 100% / var(--cell-count) + 3px), calc(var(--row) * 100% / var(--cell-count) + 3px)); transition: transform 160ms ease; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2); user-select: none; }
     .robot-label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    .robot-blue { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
-    .robot-green { background: linear-gradient(135deg, #16a34a, #0f7a37); }
-    .robot-red { background: linear-gradient(135deg, #dc2626, #b91c1c); }
-    .robot-yellow { background: linear-gradient(135deg, #f59e0b, #d97706); color: #1f2937; }
+    .robot-blue { background: linear-gradient(135deg, #31688e, #2a5a7a); }  /* Club - Blue/Teal */
+    .robot-green { background: linear-gradient(135deg, #35b779, #2a9d6a); }  /* Heart - Green */
+    .robot-red { background: linear-gradient(135deg, #440154, #3a0147); }    /* Spade - Purple */
+    .robot-yellow { background: linear-gradient(135deg, #fde725, #e6d01a); color: #1f2937; }  /* Diamond - Yellow */
+    
+    /* Add patterns to robots */
+    .robot-red.pattern-purple { background: linear-gradient(135deg, #440154, #3a0147), radial-gradient(circle, rgba(0,0,0,0.3) 1px, transparent 1px); background-size: 100% 100%, 8px 8px; }
+    .robot-blue.pattern-blue { background: linear-gradient(135deg, #31688e, #2a5a7a), repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px); }
+    .robot-green.pattern-green { background: linear-gradient(135deg, #35b779, #2a9d6a), repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px); }
+    .robot-yellow.pattern-yellow { background: linear-gradient(135deg, #fde725, #e6d01a), repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px), repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px); color: #1f2937; }
     .robot.is-selected { box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(59, 130, 246, 0.65); }
     .board-sidebar { flex: 1 1 220px; max-width: 320px; display: flex; flex-direction: column; gap: 1rem; }
     .board-selection { font-weight: 600; font-size: 1rem; }
     .robot-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .robot-badge { border-radius: 999px; padding: 0.4rem 0.9rem; border: 1px solid #d1d5db; background: #fff; font-weight: 600; cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
     .robot-badge:hover, .robot-badge:focus-visible { transform: translateY(-1px); box-shadow: 0 6px 12px rgba(59, 130, 246, 0.2); outline: none; }
-    .robot-badge-blue { color: #1d4ed8; }
-    .robot-badge-green { color: #0f7a37; }
-    .robot-badge-red { color: #b91c1c; }
-    .robot-badge-yellow { color: #b45309; }
+    .robot-badge-blue { color: #31688e; }  /* Club - Blue/Teal */
+    .robot-badge-green { color: #35b779; }  /* Heart - Green */
+    .robot-badge-red { color: #440154; }    /* Spade - Purple */
+    .robot-badge-yellow { color: #fde725; }  /* Diamond - Yellow */
     .robot-badge.is-selected { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4); }
     .arrow-controls { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 0.35rem; justify-content: flex-start; justify-items: center; align-items: center; }
     .arrow-button { border: 1px solid #d1d5db; background: #fff; border-radius: 12px; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
@@ -122,6 +129,31 @@
     .toast.toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
     .toast.toast--error { background: #b91c1c; }
     .toast.toast--info { background: #2563eb; }
+    .emoji-target { 
+      font-size: 2rem; 
+      display: block; 
+      text-align: center; 
+      line-height: 1; 
+      font-weight: bold;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    /* Shading patterns for symbols and robots */
+    .pattern-purple { 
+      background-image: radial-gradient(circle, rgba(0,0,0,0.3) 1px, transparent 1px);
+      background-size: 8px 8px;
+    }
+    .pattern-blue { 
+      background-image: repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px);
+    }
+    .pattern-green { 
+      background-image: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px);
+    }
+    .pattern-yellow { 
+      background-image: 
+        repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px),
+        repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px);
+    }
     @media (max-width: 960px) {
       body { margin: 1.25rem; }
       .board-wrapper { flex-direction: column; }
@@ -137,6 +169,8 @@
     }
   </style>
   <script src="/public/js/polling.js" defer></script>
+  <script src="/js/layoutRandomizer.js" defer></script>
+  <script src="/js/jquery.js" defer></script>
 </head>
 <body class="join-gate-open">
   <div id="join-gate" class="join-gate" role="dialog" aria-modal="true" aria-labelledby="join-gate-title">
@@ -434,18 +468,18 @@
       let nextInFlight = false;
       let claimInFlight = false;
       const BOARD_SIZE = 16;
-      const ROBOT_ORDER = ['Blue', 'Green', 'Red', 'Yellow'];
+      const ROBOT_ORDER = ['Purple', 'Blue', 'Green', 'Yellow'];
       const ROBOT_META = {
+        Purple: { id: 'red', robotClass: 'robot-red', badgeClass: 'robot-badge-red', shortLabel: 'P' },
         Blue: { id: 'blue', robotClass: 'robot-blue', badgeClass: 'robot-badge-blue', shortLabel: 'B' },
         Green: { id: 'green', robotClass: 'robot-green', badgeClass: 'robot-badge-green', shortLabel: 'G' },
-        Red: { id: 'red', robotClass: 'robot-red', badgeClass: 'robot-badge-red', shortLabel: 'R' },
         Yellow: { id: 'yellow', robotClass: 'robot-yellow', badgeClass: 'robot-badge-yellow', shortLabel: 'Y' }
       };
 
       const INITIAL_ROBOT_POSITIONS = {
-        Blue: { row: 1, col: 1 },
-        Green: { row: 1, col: 14 },
-        Red: { row: 14, col: 1 },
+        Purple: { row: 1, col: 1 },
+        Blue: { row: 1, col: 14 },
+        Green: { row: 14, col: 1 },
         Yellow: { row: 14, col: 14 }
       };
       const STATIC_WALL_DATA = {
@@ -1788,13 +1822,41 @@
             addWall(row, col, 'right');
           }
         });
-        CENTER_CELLS.forEach(function (pair) {
-          const row = pair[0];
-          const col = pair[1];
-          ['top', 'bottom', 'left', 'right'].forEach(function (side) {
-            addWall(row, col, side);
-          });
-        });
+        // Create a single outline around the center 4 squares
+        // Top edge of center area (row 7)
+        for (let col = 7; col <= 8; col++) {
+          addWall(7, col, 'top');
+        }
+        // Bottom edge of center area (row 8) 
+        for (let col = 7; col <= 8; col++) {
+          addWall(8, col, 'bottom');
+        }
+        // Left edge of center area (col 7)
+        for (let row = 7; row <= 8; row++) {
+          addWall(row, 7, 'left');
+        }
+        // Right edge of center area (col 8)
+        for (let row = 7; row <= 8; row++) {
+          addWall(row, 8, 'right');
+        }
+        
+        // Add outer perimeter walls
+        // Top edge of board (row 0)
+        for (let col = 0; col < BOARD_SIZE; col++) {
+          addWall(0, col, 'top');
+        }
+        // Bottom edge of board (row 15)
+        for (let col = 0; col < BOARD_SIZE; col++) {
+          addWall(15, col, 'bottom');
+        }
+        // Left edge of board (col 0)
+        for (let row = 0; row < BOARD_SIZE; row++) {
+          addWall(row, 0, 'left');
+        }
+        // Right edge of board (col 15)
+        for (let row = 0; row < BOARD_SIZE; row++) {
+          addWall(row, 15, 'right');
+        }
       }
 
       function buildBoardGrid() {
@@ -1809,6 +1871,11 @@
             cell.className = 'board-cell';
             cell.dataset.row = String(r);
             cell.dataset.col = String(c);
+            
+            // Add center-cell class for the center 4 squares
+            if ((r === 7 || r === 8) && (c === 7 || c === 8)) {
+              cell.classList.add('center-cell');
+            }
             const cellWalls = boardWalls.get(`${r},${c}`);
             if (cellWalls) {
               if (cellWalls.top) {
@@ -1831,11 +1898,47 @@
       }
 
       function initializeRobots() {
+        const occupiedPositions = new Set();
+        
+        // Get all symbol positions
+        boardGridEl.querySelectorAll('.emoji-target').forEach(symbol => {
+          const cell = symbol.closest('.board-cell');
+          if (cell) {
+            const row = parseInt(cell.dataset.row);
+            const col = parseInt(cell.dataset.col);
+            occupiedPositions.add(`${row},${col}`);
+          }
+        });
+        
+        // Place each robot randomly, avoiding symbols and other robots
         ROBOT_ORDER.forEach(function (name) {
-          const start = INITIAL_ROBOT_POSITIONS[name] || { row: 0, col: 0 };
-          const clampedRow = Math.max(0, Math.min(BOARD_SIZE - 1, start.row));
-          const clampedCol = Math.max(0, Math.min(BOARD_SIZE - 1, start.col));
-          robotState[name] = { row: clampedRow, col: clampedCol };
+          let position = null;
+          let tries = 0;
+          
+          while (position === null && tries < 200) {
+            const row = Math.floor(Math.random() * BOARD_SIZE);
+            const col = Math.floor(Math.random() * BOARD_SIZE);
+            const key = `${row},${col}`;
+            
+            // Skip if position is occupied by symbol, other robot, or center area
+            if (!occupiedPositions.has(key) && 
+                !((row === 7 || row === 8) && (col === 7 || col === 8))) {
+              position = { row, col };
+              occupiedPositions.add(key);
+            }
+            tries++;
+          }
+          
+          // Fallback to original position if random placement fails
+          if (position === null) {
+            const start = INITIAL_ROBOT_POSITIONS[name] || { row: 0, col: 0 };
+            position = {
+              row: Math.max(0, Math.min(BOARD_SIZE - 1, start.row)),
+              col: Math.max(0, Math.min(BOARD_SIZE - 1, start.col))
+            };
+          }
+          
+          robotState[name] = position;
         });
       }
 
@@ -1881,6 +1984,18 @@
           }
           const robotEl = document.createElement('div');
           robotEl.className = `robot ${meta.robotClass}`;
+          
+          // Add pattern class based on robot color
+          if (name === 'Purple') {
+            robotEl.classList.add('pattern-purple');
+          } else if (name === 'Blue') {
+            robotEl.classList.add('pattern-blue');
+          } else if (name === 'Green') {
+            robotEl.classList.add('pattern-green');
+          } else if (name === 'Yellow') {
+            robotEl.classList.add('pattern-yellow');
+          }
+          
           robotEl.dataset.robot = name;
           robotEl.style.setProperty('--row', String(state.row));
           robotEl.style.setProperty('--col', String(state.col));
@@ -2082,6 +2197,114 @@
         }
       }
 
+      function placeSymbols() {
+        if (!boardGridEl) {
+          return;
+        }
+
+        // Clear existing symbols
+        boardGridEl.querySelectorAll('.emoji-target').forEach(el => el.remove());
+
+        // Define quadrants (4 symbols per quadrant)
+        const quadrants = [
+          { x: [0, 7], y: [0, 7] },   // top left
+          { x: [8, 15], y: [0, 7] },  // top right
+          { x: [0, 7], y: [8, 15] },  // bottom left
+          { x: [8, 15], y: [8, 15] }  // bottom right
+        ];
+
+        const suits = ["spade", "club", "heart", "diamond"];
+        const shapes = ["spade", "club", "heart", "diamond"];
+
+        const symbolMap = {
+          "spade": { symbol: "♠", color: "#440154" },    // Purple
+          "club": { symbol: "♣", color: "#31688e" },     // Blue/Teal
+          "heart": { symbol: "♥", color: "#35b779" },    // Green
+          "diamond": { symbol: "♦", color: "#fde725" }   // Yellow
+        };
+
+        // Shuffle arrays
+        function shuffleArray(arr) {
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+        }
+
+        // Get random position in quadrant
+        function getRandomPositionInQuadrant(quad) {
+          const xRange = quad.x;
+          const yRange = quad.y;
+          for (let tries = 0; tries < 200; tries++) {
+            const x = Math.floor(Math.random() * (xRange[1] - xRange[0] + 1)) + xRange[0];
+            const y = Math.floor(Math.random() * (yRange[1] - yRange[0] + 1)) + yRange[0];
+            
+            // Skip center 4 squares (7,7), (7,8), (8,7), (8,8)
+            if ((x === 7 || x === 8) && (y === 7 || y === 8)) {
+              continue;
+            }
+            
+            const cell = boardGridEl.querySelector(`.board-cell[data-row="${y}"][data-col="${x}"]`);
+            if (cell && !cell.querySelector('.emoji-target') && !cell.classList.contains('specialCenter')) {
+              return { x, y, cell };
+            }
+          }
+          return null;
+        }
+
+        // Place symbols in each quadrant
+        // Each quadrant gets all 4 suits, but with different color assignments
+        const colorAssignments = [
+          // Quadrant 1: Purple, Blue, Green, Yellow
+          { spade: "#440154", club: "#31688e", heart: "#35b779", diamond: "#fde725" },
+          // Quadrant 2: Blue, Green, Yellow, Purple  
+          { spade: "#31688e", club: "#35b779", heart: "#fde725", diamond: "#440154" },
+          // Quadrant 3: Green, Yellow, Purple, Blue
+          { spade: "#35b779", club: "#fde725", heart: "#440154", diamond: "#31688e" },
+          // Quadrant 4: Yellow, Purple, Blue, Green
+          { spade: "#fde725", club: "#440154", heart: "#31688e", diamond: "#35b779" }
+        ];
+
+        quadrants.forEach((quad, quadIndex) => {
+          const colorMap = colorAssignments[quadIndex];
+          
+          // Create 4 symbol combinations for this quadrant (one of each suit)
+          const combos = suits.map(suit => ({
+            suit: suit,
+            color: colorMap[suit]
+          }));
+
+          // Shuffle the combinations for random placement
+          shuffleArray(combos);
+
+          // Place each symbol in the quadrant
+          combos.forEach(combo => {
+            const position = getRandomPositionInQuadrant(quad);
+            if (position) {
+              const symbolData = symbolMap[combo.suit];
+              const symbolEl = document.createElement('span');
+              symbolEl.className = 'emoji-target';
+              symbolEl.textContent = symbolData.symbol;
+              symbolEl.style.color = combo.color;
+              symbolEl.setAttribute('data-symbol-suit', combo.suit);
+              
+              // Add pattern class based on color
+              if (combo.color === '#440154') {
+                symbolEl.classList.add('pattern-purple');
+              } else if (combo.color === '#31688e') {
+                symbolEl.classList.add('pattern-blue');
+              } else if (combo.color === '#35b779') {
+                symbolEl.classList.add('pattern-green');
+              } else if (combo.color === '#fde725') {
+                symbolEl.classList.add('pattern-yellow');
+              }
+              
+              position.cell.appendChild(symbolEl);
+            }
+          });
+        });
+      }
+
       function initBoard() {
         if (boardInitialized) {
           return;
@@ -2099,6 +2322,7 @@
         initializeRobots();
         renderRobotBadges();
         renderRobots();
+        placeSymbols();
         boardEl.addEventListener('focus', function () {
           boardActive = true;
           boardEl.classList.add('is-focused');
