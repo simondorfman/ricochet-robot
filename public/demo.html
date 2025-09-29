@@ -76,29 +76,24 @@
     .board-cell.wall-right { border-right-width: 4px; border-right-color: #1f2937; }
     .board-cell.is-selected::after { content: ''; position: absolute; inset: 3px; border-radius: 6px; border: 2px solid rgba(59, 130, 246, 0.8); pointer-events: none; }
     .board-cell.center-cell { border: none; background: #1f2937; }
-    .robot-layer { pointer-events: none; }
-    .robot { pointer-events: auto; position: absolute; width: calc(100% / var(--cell-count) - 6px); height: calc(100% / var(--cell-count) - 6px); transform: translate(calc(var(--col) * 100% / var(--cell-count) + 3px), calc(var(--row) * 100% / var(--cell-count) + 3px)); transition: transform 160ms ease; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2); user-select: none; }
+    .robot-layer { pointer-events: none; --cell-count: 16; }
+    .robot { pointer-events: auto; position: absolute; width: calc(100% / 16 - 6px); height: calc(100% / 16 - 6px); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2); user-select: none; transition: all 160ms ease; border: 2px solid #1f2937; }
     .robot-label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    .robot-blue { background: linear-gradient(135deg, #31688e, #2a5a7a); }  /* Club - Blue/Teal */
-    .robot-green { background: linear-gradient(135deg, #35b779, #2a9d6a); }  /* Heart - Green */
-    .robot-red { background: linear-gradient(135deg, #440154, #3a0147); }    /* Spade - Purple */
-    .robot-yellow { background: linear-gradient(135deg, #fde725, #e6d01a); color: #1f2937; }  /* Diamond - Yellow */
+    .robot-purple { background: linear-gradient(135deg, #482878, #3a1f5c); }  /* Indigo */
+    .robot-cyan { background: linear-gradient(135deg, #26828e, #1e6b73); }    /* Cyan */
+    .robot-lime { background: linear-gradient(135deg, #90d743, #7bb83a); }    /* Lime */
+    .robot-yellow { background: linear-gradient(135deg, #fde725, #e6d01a); color: #1f2937; }  /* Yellow */
     
-    /* Add patterns to robots */
-    .robot-red.pattern-purple { background: linear-gradient(135deg, #440154, #3a0147), radial-gradient(circle, rgba(0,0,0,0.3) 1px, transparent 1px); background-size: 100% 100%, 8px 8px; }
-    .robot-blue.pattern-blue { background: linear-gradient(135deg, #31688e, #2a5a7a), repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px); }
-    .robot-green.pattern-green { background: linear-gradient(135deg, #35b779, #2a9d6a), repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px); }
-    .robot-yellow.pattern-yellow { background: linear-gradient(135deg, #fde725, #e6d01a), repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px), repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px); color: #1f2937; }
     .robot.is-selected { box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(59, 130, 246, 0.65); }
     .board-sidebar { flex: 1 1 220px; max-width: 320px; display: flex; flex-direction: column; gap: 1rem; }
     .board-selection { font-weight: 600; font-size: 1rem; }
     .robot-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .robot-badge { border-radius: 999px; padding: 0.4rem 0.9rem; border: 1px solid #d1d5db; background: #fff; font-weight: 600; cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
     .robot-badge:hover, .robot-badge:focus-visible { transform: translateY(-1px); box-shadow: 0 6px 12px rgba(59, 130, 246, 0.2); outline: none; }
-    .robot-badge-blue { color: #31688e; }  /* Club - Blue/Teal */
-    .robot-badge-green { color: #35b779; }  /* Heart - Green */
-    .robot-badge-red { color: #440154; }    /* Spade - Purple */
-    .robot-badge-yellow { color: #fde725; }  /* Diamond - Yellow */
+    .robot-badge-purple { color: #482878; }  /* Indigo */
+    .robot-badge-cyan { color: #26828e; }     /* Cyan */
+    .robot-badge-lime { color: #90d743; }    /* Lime */
+    .robot-badge-yellow { color: #fde725; }  /* Yellow */
     .robot-badge.is-selected { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4); }
     .arrow-controls { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 0.35rem; justify-content: flex-start; justify-items: center; align-items: center; }
     .arrow-button { border: 1px solid #d1d5db; background: #fff; border-radius: 12px; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
@@ -138,22 +133,6 @@
       text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     }
     
-    /* Shading patterns for symbols and robots */
-    .pattern-purple { 
-      background-image: radial-gradient(circle, rgba(0,0,0,0.3) 1px, transparent 1px);
-      background-size: 8px 8px;
-    }
-    .pattern-blue { 
-      background-image: repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px);
-    }
-    .pattern-green { 
-      background-image: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px);
-    }
-    .pattern-yellow { 
-      background-image: 
-        repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px),
-        repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px);
-    }
     @media (max-width: 960px) {
       body { margin: 1.25rem; }
       .board-wrapper { flex-direction: column; }
@@ -470,9 +449,9 @@
       const BOARD_SIZE = 16;
       const ROBOT_ORDER = ['Purple', 'Blue', 'Green', 'Yellow'];
       const ROBOT_META = {
-        Purple: { id: 'red', robotClass: 'robot-red', badgeClass: 'robot-badge-red', shortLabel: 'P' },
-        Blue: { id: 'blue', robotClass: 'robot-blue', badgeClass: 'robot-badge-blue', shortLabel: 'B' },
-        Green: { id: 'green', robotClass: 'robot-green', badgeClass: 'robot-badge-green', shortLabel: 'G' },
+        Purple: { id: 'purple', robotClass: 'robot-purple', badgeClass: 'robot-badge-purple', shortLabel: 'P' },
+        Blue: { id: 'cyan', robotClass: 'robot-cyan', badgeClass: 'robot-badge-cyan', shortLabel: 'C' },
+        Green: { id: 'lime', robotClass: 'robot-lime', badgeClass: 'robot-badge-lime', shortLabel: 'L' },
         Yellow: { id: 'yellow', robotClass: 'robot-yellow', badgeClass: 'robot-badge-yellow', shortLabel: 'Y' }
       };
 
@@ -482,38 +461,73 @@
         Green: { row: 14, col: 1 },
         Yellow: { row: 14, col: 14 }
       };
+      // Static wall data system
+
       const STATIC_WALL_DATA = {
-        '0,3': [0, 0, 0, 1],
-        '0,9': [0, 0, 0, 1],
-        '1,13': [0, 1, 0, 1],
-        '1,15': [0, 1, 0, 0],
-        '2,5': [0, 1, 0, 1],
-        '3,9': [1, 0, 1, 0],
-        '4,0': [0, 1, 0, 0],
-        '4,2': [1, 0, 0, 1],
-        '4,14': [1, 0, 0, 1],
-        '5,7': [0, 1, 1, 0],
-        '6,1': [1, 0, 1, 0],
-        '6,12': [0, 1, 1, 0],
-        '7,7': [1, 0, 1, 0],
-        '7,8': [1, 0, 0, 1],
-        '8,7': [0, 1, 1, 0],
-        '8,8': [0, 1, 0, 1],
-        '8,12': [1, 0, 1, 0],
-        '9,3': [0, 1, 0, 1],
-        '9,10': [0, 1, 1, 0],
-        '10,0': [0, 1, 0, 0],
-        '10,15': [0, 1, 0, 0],
-        '11,5': [1, 0, 1, 0],
-        '11,9': [0, 1, 0, 1],
-        '12,14': [1, 0, 0, 1],
-        '13,1': [0, 1, 1, 0],
-        '14,6': [1, 0, 0, 1],
-        '14,13': [1, 0, 1, 0],
-        '15,4': [0, 0, 0, 1],
-        '15,10': [0, 0, 0, 1]
+        '0,3': [0, 0, 0, 1],    // Row 0, Col 3: right wall
+        '0,11': [0, 0, 0, 1],   // Row 0, Col 11: right wall
+        '1,1': [0, 1, 1, 0],    // Row 1, Col 1: bottom + left walls
+        '1,9': [0, 1, 0, 1],    // Row 1, Col 9: bottom + right walls
+        '2,6': [1, 0, 0, 1],    // Row 2, Col 6: top + right walls
+        '2,15': [0, 1, 0, 0],   // Row 2, Col 15: bottom wall
+        '3,11': [0, 1, 1, 0],   // Row 3, Col 11: bottom + left walls
+        '4,2': [0, 1, 0, 1],    // Row 4, Col 2: bottom + right walls
+        '5,0': [0, 1, 0, 0],    // Row 5, Col 0: bottom wall
+        '5,7': [1, 0, 1, 0],    // Row 5, Col 7: top + left walls
+        '5,14': [1, 0, 1, 0],   // Row 5, Col 14: top + left walls
+        '6,10': [1, 0, 0, 1],   // Row 6, Col 10: top + right walls
+        '7,7': [1, 0, 1, 0],    // Row 7, Col 7: top + left walls
+        '7,8': [1, 0, 0, 1],    // Row 7, Col 8: top + right walls
+        '7,13': [0, 1, 1, 0],   // Row 7, Col 13: bottom + left walls
+        '8,7': [0, 1, 1, 0],    // Row 8, Col 7: bottom + left walls
+        '8,8': [0, 1, 0, 1],    // Row 8, Col 8: bottom + right walls
+        '9,3': [1, 0, 0, 1],    // Row 9, Col 3: top + right walls
+        '10,11': [1, 0, 1, 0],  // Row 10, Col 11: top + left walls
+        '11,1': [0, 1, 1, 0],   // Row 11, Col 1: bottom + left walls
+        '11,13': [0, 1, 1, 0],  // Row 11, Col 13: bottom + left walls
+        '11,15': [0, 1, 0, 0],  // Row 11, Col 15: bottom wall
+        '12,6': [0, 1, 0, 1],   // Row 12, Col 6: bottom + right walls
+        '12,10': [1, 0, 0, 1],  // Row 12, Col 10: top + right walls
+        '13,0': [0, 1, 0, 0],   // Row 13, Col 0: bottom wall
+        '13,12': [0, 1, 0, 1],  // Row 13, Col 12: bottom + right walls
+        '14,2': [1, 0, 1, 0],   // Row 14, Col 2: top + left walls
+        '15,5': [0, 0, 0, 1],   // Row 15, Col 5: right wall
+        '15,9': [0, 0, 0, 1]    // Row 15, Col 9: right wall
       };
+      
+      // Valid symbol positions - aligned with wall data for quadrant shuffling
+      // Organized by quadrant for proper distribution
+      const SYMBOL_POSITIONS = {
+        'quadrant1': [  // Top-Left: Rows 0-7, Cols 0-7
+          { row: 1, col: 1, symbol: 'DI' }, // Diamond Indigo
+          { row: 2, col: 6, symbol: 'HL' }, // Heart Lime
+          { row: 4, col: 2, symbol: 'CC' }, // Club Cyan
+          { row: 5, col: 7, symbol: 'SY' }  // Spade Yellow
+        ],
+        'quadrant2': [  // Top-Right: Rows 0-7, Cols 8-15
+          { row: 1, col: 9, symbol: 'DY' }, // Diamond Yellow
+          { row: 3, col: 11, symbol: 'CI' }, // Club Indigo
+          { row: 5, col: 14, symbol: 'HC' }, // Heart Cyan
+          { row: 6, col: 10, symbol: 'SL' }  // Spade Lime
+        ],
+        'quadrant3': [  // Bottom-Left: Rows 8-15, Cols 0-7
+          { row: 9, col: 3, symbol: 'CY' }, // Club Yellow
+          { row: 11, col: 1, symbol: 'HI' }, // Heart Indigo
+          { row: 12, col: 6, symbol: 'SC' }, // Spade Cyan
+          { row: 14, col: 2, symbol: 'DL' } // Diamond Lime
+        ],
+        'quadrant4': [  // Bottom-Right: Rows 8-15, Cols 8-15
+          // { row: 7, col: 13 },
+          { row: 10, col: 11, symbol: 'CL' }, // Club Lime
+          { row: 11, col: 13, symbol: 'SI' }, // Spade Indigo
+          { row: 12, col: 10, symbol: 'DC' }, // Diamond Cyan
+          { row: 13, col: 12, symbol: 'HY' }  // Heart Yellow
+        ]
+      };
+      
       const CENTER_CELLS = [[7, 7], [7, 8], [8, 7], [8, 8]];
+      
+      
       const KEY_TO_DIR = {
         ArrowUp: 'UP',
         ArrowDown: 'DOWN',
@@ -1799,64 +1813,34 @@
             ensureCellWall(r, c);
           }
         }
-        Object.entries(STATIC_WALL_DATA).forEach(function ([key, arr]) {
+        
+        // Apply walls from static data only
+        Object.entries(STATIC_WALL_DATA).forEach(([key, arr]) => {
           if (!Array.isArray(arr) || arr.length < 4) {
             return;
           }
-          const parts = key.split(',');
-          const row = Number.parseInt(parts[0], 10);
-          const col = Number.parseInt(parts[1], 10);
-          if (!Number.isFinite(row) || !Number.isFinite(col)) {
+          
+          const [top, bottom, left, right] = arr;
+          const [row, col] = key.split(',').map(Number);
+          
+          // Skip if outside board bounds
+          if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
             return;
           }
-          if (arr[0]) {
+          
+          if (top) {
             addWall(row, col, 'top');
           }
-          if (arr[1]) {
+          if (bottom) {
             addWall(row, col, 'bottom');
           }
-          if (arr[2]) {
+          if (left) {
             addWall(row, col, 'left');
           }
-          if (arr[3]) {
+          if (right) {
             addWall(row, col, 'right');
           }
         });
-        // Create a single outline around the center 4 squares
-        // Top edge of center area (row 7)
-        for (let col = 7; col <= 8; col++) {
-          addWall(7, col, 'top');
-        }
-        // Bottom edge of center area (row 8) 
-        for (let col = 7; col <= 8; col++) {
-          addWall(8, col, 'bottom');
-        }
-        // Left edge of center area (col 7)
-        for (let row = 7; row <= 8; row++) {
-          addWall(row, 7, 'left');
-        }
-        // Right edge of center area (col 8)
-        for (let row = 7; row <= 8; row++) {
-          addWall(row, 8, 'right');
-        }
-        
-        // Add outer perimeter walls
-        // Top edge of board (row 0)
-        for (let col = 0; col < BOARD_SIZE; col++) {
-          addWall(0, col, 'top');
-        }
-        // Bottom edge of board (row 15)
-        for (let col = 0; col < BOARD_SIZE; col++) {
-          addWall(15, col, 'bottom');
-        }
-        // Left edge of board (col 0)
-        for (let row = 0; row < BOARD_SIZE; row++) {
-          addWall(row, 0, 'left');
-        }
-        // Right edge of board (col 15)
-        for (let row = 0; row < BOARD_SIZE; row++) {
-          addWall(row, 15, 'right');
-        }
       }
 
       function buildBoardGrid() {
@@ -1931,7 +1915,7 @@
           
           // Fallback to original position if random placement fails
           if (position === null) {
-            const start = INITIAL_ROBOT_POSITIONS[name] || { row: 0, col: 0 };
+          const start = INITIAL_ROBOT_POSITIONS[name] || { row: 0, col: 0 };
             position = {
               row: Math.max(0, Math.min(BOARD_SIZE - 1, start.row)),
               col: Math.max(0, Math.min(BOARD_SIZE - 1, start.col))
@@ -1985,20 +1969,18 @@
           const robotEl = document.createElement('div');
           robotEl.className = `robot ${meta.robotClass}`;
           
-          // Add pattern class based on robot color
-          if (name === 'Purple') {
-            robotEl.classList.add('pattern-purple');
-          } else if (name === 'Blue') {
-            robotEl.classList.add('pattern-blue');
-          } else if (name === 'Green') {
-            robotEl.classList.add('pattern-green');
-          } else if (name === 'Yellow') {
-            robotEl.classList.add('pattern-yellow');
-          }
           
           robotEl.dataset.robot = name;
-          robotEl.style.setProperty('--row', String(state.row));
-          robotEl.style.setProperty('--col', String(state.col));
+          robotEl.dataset.row = state.row;
+          robotEl.dataset.col = state.col;
+          
+          // Calculate position as percentage
+          const leftPercent = (state.col * 100) / 16;
+          const topPercent = (state.row * 100) / 16;
+          robotEl.style.left = `calc(${leftPercent}% + 3px)`;
+          robotEl.style.top = `calc(${topPercent}% + 3px)`;
+          
+          console.log(`Robot ${name}: row=${state.row}, col=${state.col}, left=${leftPercent}%, top=${topPercent}%`);
           robotEl.setAttribute('role', 'img');
           robotEl.setAttribute('aria-label', `${name} robot at row ${state.row} column ${state.col}`);
           robotEl.tabIndex = -1;
@@ -2205,101 +2187,37 @@
         // Clear existing symbols
         boardGridEl.querySelectorAll('.emoji-target').forEach(el => el.remove());
 
-        // Define quadrants (4 symbols per quadrant)
-        const quadrants = [
-          { x: [0, 7], y: [0, 7] },   // top left
-          { x: [8, 15], y: [0, 7] },  // top right
-          { x: [0, 7], y: [8, 15] },  // bottom left
-          { x: [8, 15], y: [8, 15] }  // bottom right
-        ];
-
-        const suits = ["spade", "club", "heart", "diamond"];
-        const shapes = ["spade", "club", "heart", "diamond"];
-
         const symbolMap = {
-          "spade": { symbol: "♠", color: "#440154" },    // Purple
-          "club": { symbol: "♣", color: "#31688e" },     // Blue/Teal
-          "heart": { symbol: "♥", color: "#35b779" },    // Green
-          "diamond": { symbol: "♦", color: "#fde725" }   // Yellow
+          "D": "♦", // Diamond
+          "H": "♥", // Heart
+          "C": "♣", // Club
+          "S": "♠"  // Spade
         };
 
-        // Shuffle arrays
-        function shuffleArray(arr) {
-          for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-          }
-        }
+        const colorMap = {
+          "I": "#482878", // Indigo
+          "L": "#90d743", // Lime
+          "Y": "#fde725", // Yellow
+          "C": "#26828e"  // Cyan
+        };
 
-        // Get random position in quadrant
-        function getRandomPositionInQuadrant(quad) {
-          const xRange = quad.x;
-          const yRange = quad.y;
-          for (let tries = 0; tries < 200; tries++) {
-            const x = Math.floor(Math.random() * (xRange[1] - xRange[0] + 1)) + xRange[0];
-            const y = Math.floor(Math.random() * (yRange[1] - yRange[0] + 1)) + yRange[0];
+        // Place symbols according to the fixed placement map
+        Object.values(SYMBOL_POSITIONS).forEach(positions => {
+          positions.forEach(position => {
+            const cell = boardGridEl.querySelector(`.board-cell[data-row="${position.row}"][data-col="${position.col}"]`);
             
-            // Skip center 4 squares (7,7), (7,8), (8,7), (8,8)
-            if ((x === 7 || x === 8) && (y === 7 || y === 8)) {
-              continue;
-            }
-            
-            const cell = boardGridEl.querySelector(`.board-cell[data-row="${y}"][data-col="${x}"]`);
-            if (cell && !cell.querySelector('.emoji-target') && !cell.classList.contains('specialCenter')) {
-              return { x, y, cell };
-            }
-          }
-          return null;
-        }
-
-        // Place symbols in each quadrant
-        // Each quadrant gets all 4 suits, but with different color assignments
-        const colorAssignments = [
-          // Quadrant 1: Purple, Blue, Green, Yellow
-          { spade: "#440154", club: "#31688e", heart: "#35b779", diamond: "#fde725" },
-          // Quadrant 2: Blue, Green, Yellow, Purple  
-          { spade: "#31688e", club: "#35b779", heart: "#fde725", diamond: "#440154" },
-          // Quadrant 3: Green, Yellow, Purple, Blue
-          { spade: "#35b779", club: "#fde725", heart: "#440154", diamond: "#31688e" },
-          // Quadrant 4: Yellow, Purple, Blue, Green
-          { spade: "#fde725", club: "#440154", heart: "#31688e", diamond: "#35b779" }
-        ];
-
-        quadrants.forEach((quad, quadIndex) => {
-          const colorMap = colorAssignments[quadIndex];
-          
-          // Create 4 symbol combinations for this quadrant (one of each suit)
-          const combos = suits.map(suit => ({
-            suit: suit,
-            color: colorMap[suit]
-          }));
-
-          // Shuffle the combinations for random placement
-          shuffleArray(combos);
-
-          // Place each symbol in the quadrant
-          combos.forEach(combo => {
-            const position = getRandomPositionInQuadrant(quad);
-            if (position) {
-              const symbolData = symbolMap[combo.suit];
+            if (cell && !cell.querySelector('.emoji-target')) {
+              const symbolCode = position.symbol;
+              const shape = symbolCode[0]; // First character (D, H, C, S)
+              const color = symbolCode[1]; // Second character (I, L, Y, C)
+              
               const symbolEl = document.createElement('span');
               symbolEl.className = 'emoji-target';
-              symbolEl.textContent = symbolData.symbol;
-              symbolEl.style.color = combo.color;
-              symbolEl.setAttribute('data-symbol-suit', combo.suit);
+              symbolEl.textContent = symbolMap[shape];
+              symbolEl.style.color = colorMap[color];
+              symbolEl.setAttribute('data-symbol-suit', shape);
               
-              // Add pattern class based on color
-              if (combo.color === '#440154') {
-                symbolEl.classList.add('pattern-purple');
-              } else if (combo.color === '#31688e') {
-                symbolEl.classList.add('pattern-blue');
-              } else if (combo.color === '#35b779') {
-                symbolEl.classList.add('pattern-green');
-              } else if (combo.color === '#fde725') {
-                symbolEl.classList.add('pattern-yellow');
-              }
-              
-              position.cell.appendChild(symbolEl);
+              cell.appendChild(symbolEl);
             }
           });
         });
@@ -2319,10 +2237,10 @@
         boardEl.classList.remove('is-focused');
         buildWallData();
         buildBoardGrid();
+        placeSymbols();
         initializeRobots();
         renderRobotBadges();
         renderRobots();
-        placeSymbols();
         boardEl.addEventListener('focus', function () {
           boardActive = true;
           boardEl.classList.add('is-focused');
