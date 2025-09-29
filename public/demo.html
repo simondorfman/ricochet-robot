@@ -133,6 +133,22 @@
       text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     }
     
+    .quad-symbol {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 2px;
+      width: 1.5rem;
+      height: 1.5rem;
+      margin: 0 auto;
+    }
+    
+    .quad-square {
+      width: 100%;
+      height: 100%;
+      border-radius: 2px;
+    }
+    
     @media (max-width: 960px) {
       body { margin: 1.25rem; }
       .board-wrapper { flex-direction: column; }
@@ -517,7 +533,7 @@
           { row: 14, col: 2, symbol: 'DL' } // Diamond Lime
         ],
         'quadrant4': [  // Bottom-Right: Rows 8-15, Cols 8-15
-          // { row: 7, col: 13 },
+          { row: 7, col: 13, symbol: 'QUAD' }, // Special 4-color square
           { row: 10, col: 11, symbol: 'CL' }, // Club Lime
           { row: 11, col: 13, symbol: 'SI' }, // Spade Indigo
           { row: 12, col: 10, symbol: 'DC' }, // Diamond Cyan
@@ -2208,16 +2224,35 @@
             
             if (cell && !cell.querySelector('.emoji-target')) {
               const symbolCode = position.symbol;
-              const shape = symbolCode[0]; // First character (D, H, C, S)
-              const color = symbolCode[1]; // Second character (I, L, Y, C)
               
-              const symbolEl = document.createElement('span');
-              symbolEl.className = 'emoji-target';
-              symbolEl.textContent = symbolMap[shape];
-              symbolEl.style.color = colorMap[color];
-              symbolEl.setAttribute('data-symbol-suit', shape);
-              
-              cell.appendChild(symbolEl);
+              if (symbolCode === 'QUAD') {
+                // Create 4-color square symbol
+                const symbolEl = document.createElement('div');
+                symbolEl.className = 'emoji-target quad-symbol';
+                
+                // Create 4 small squares
+                const colors = ["#482878", "#90d743", "#fde725", "#26828e"]; // I, L, Y, C
+                colors.forEach(color => {
+                  const square = document.createElement('div');
+                  square.className = 'quad-square';
+                  square.style.backgroundColor = color;
+                  symbolEl.appendChild(square);
+                });
+                
+                cell.appendChild(symbolEl);
+              } else {
+                // Regular symbol handling
+                const shape = symbolCode[0]; // First character (D, H, C, S)
+                const color = symbolCode[1]; // Second character (I, L, Y, C)
+                
+                const symbolEl = document.createElement('span');
+                symbolEl.className = 'emoji-target';
+                symbolEl.textContent = symbolMap[shape];
+                symbolEl.style.color = colorMap[color];
+                symbolEl.setAttribute('data-symbol-suit', shape);
+                
+                cell.appendChild(symbolEl);
+              }
             }
           });
         });
