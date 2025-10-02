@@ -149,6 +149,291 @@
       border-radius: 2px;
     }
     
+    .current-target {
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      text-align: center;
+    }
+    
+    .target-placeholder {
+      color: #64748b;
+      font-style: italic;
+    }
+    
+    .target-single, .target-quad {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .target-symbol {
+      font-size: 2rem;
+      font-weight: bold;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    .target-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #374151;
+    }
+    
+    .target-quad .quad-symbol {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 2px;
+      width: 2rem;
+      height: 2rem;
+    }
+    
+    .target-highlight {
+      background: rgba(59, 130, 246, 0.2) !important;
+      border: 2px solid rgba(59, 130, 246, 0.6) !important;
+    }
+    
+    .sandbox-controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+    
+    .sandbox-controls button {
+      font-size: 0.9rem;
+      padding: 0.4rem 0.8rem;
+    }
+    
+    .demo-controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+    
+    .demo-controls button {
+      font-size: 0.9rem;
+      padding: 0.4rem 0.8rem;
+    }
+    
+    .mobile-controls {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    
+    .radial-pad {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #f3f4f6;
+      border: 2px solid #d1d5db;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+    }
+    
+    .radial-pad-center {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #6b7280;
+      position: relative;
+    }
+    
+    .radial-pad-direction {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #3b82f6;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.2rem;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+    }
+    
+    .radial-pad-direction:hover {
+      background: #2563eb;
+      transform: scale(1.1);
+    }
+    
+    .radial-pad-direction:active {
+      transform: scale(0.95);
+    }
+    
+    .radial-pad-up { top: 5px; left: 50%; transform: translateX(-50%); }
+    .radial-pad-right { right: 5px; top: 50%; transform: translateY(-50%); }
+    .radial-pad-down { bottom: 5px; left: 50%; transform: translateX(-50%); }
+    .radial-pad-left { left: 5px; top: 50%; transform: translateY(-50%); }
+    
+    .swipe-hint {
+      font-size: 0.9rem;
+      color: #6b7280;
+      text-align: center;
+    }
+    
+    @media (max-width: 768px) {
+      .mobile-controls {
+        display: flex;
+      }
+      
+      .arrow-controls {
+        display: none;
+      }
+      
+      .timer-display {
+        font-size: 2.5rem;
+      }
+      
+      .bid-ladder-item {
+        padding: 0.75rem;
+        font-size: 1rem;
+      }
+    }
+    
+    .timer-container {
+      margin: 0.75rem 0;
+      text-align: center;
+    }
+    
+    .timer-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.5rem;
+    }
+    
+    .timer-display {
+      font-size: 3rem;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      color: #1f2937;
+      margin-bottom: 0.5rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .timer-bar {
+      width: 100%;
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .timer-progress {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      width: 100%;
+    }
+    
+    .timer-progress.warning {
+      background: linear-gradient(90deg, #f59e0b, #ef4444);
+    }
+    
+    .timer-progress.critical {
+      background: #ef4444;
+      animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    @keyframes celebrate {
+      0%, 100% { transform: scale(1); }
+      25% { transform: scale(1.02); }
+      50% { transform: scale(1.05); }
+      75% { transform: scale(1.02); }
+    }
+    
+    .bid-ladder {
+      margin: 0.75rem 0;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+    
+    .bid-ladder-header {
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .bid-ladder-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    
+    .bid-ladder-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    
+    .bid-ladder-item.leading {
+      border-color: #10b981;
+      background: #ecfdf5;
+      font-weight: 600;
+    }
+    
+    .bid-ladder-item.tie {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+    
+    .bid-ladder-item.you {
+      border-color: #8b5cf6;
+      background: #f3e8ff;
+      font-weight: 600;
+    }
+    
+    .bid-ladder-player {
+      color: #374151;
+    }
+    
+    .bid-ladder-value {
+      font-weight: 700;
+      color: #1f2937;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    
     @media (max-width: 960px) {
       body { margin: 1.25rem; }
       .board-wrapper { flex-direction: column; }
@@ -204,6 +489,10 @@
           <div class="players-header">
             <button type="button" id="claim-host" class="secondary" hidden>Claim Host</button>
           </div>
+          <div id="bid-ladder" class="bid-ladder">
+            <div class="bid-ladder-header">Current Bids</div>
+            <div id="bid-ladder-list" class="bid-ladder-list"></div>
+          </div>
           <table>
             <thead>
               <tr>
@@ -240,15 +529,38 @@
                 <button type="button" class="arrow-button arrow-right" data-dir="RIGHT" aria-label="Move right">→</button>
                 <button type="button" class="arrow-button arrow-down" data-dir="DOWN" aria-label="Move down">↓</button>
               </div>
+              <div id="sandbox-controls" class="sandbox-controls" hidden>
+                <button type="button" id="reset-sandbox" class="secondary">Reset</button>
+                <button type="button" id="undo-move" class="secondary">Undo</button>
+                <button type="button" id="exit-thinking" class="secondary">Exit Thinking</button>
+              </div>
+              <div id="demo-controls" class="demo-controls" hidden>
+                <button type="button" id="start-demo" class="primary">Start Demo</button>
+                <button type="button" id="next-demo-step" class="secondary">Next Step</button>
+                <button type="button" id="prev-demo-step" class="secondary">Prev Step</button>
+                <button type="button" id="end-demo" class="secondary">End Demo</button>
+              </div>
+              <div id="mobile-controls" class="mobile-controls">
+                <div class="radial-pad" id="radial-pad">
+                  <div class="radial-pad-center"></div>
+                  <button class="radial-pad-direction radial-pad-up" data-dir="UP" aria-label="Move up">↑</button>
+                  <button class="radial-pad-direction radial-pad-right" data-dir="RIGHT" aria-label="Move right">→</button>
+                  <button class="radial-pad-direction radial-pad-down" data-dir="DOWN" aria-label="Move down">↓</button>
+                  <button class="radial-pad-direction radial-pad-left" data-dir="LEFT" aria-label="Move left">←</button>
+                </div>
+                <div class="swipe-hint">Or swipe on the board to move</div>
+              </div>
             </div>
             <div class="controls-help">
               <details class="board-help" open>
                 <summary>Keyboard tips</summary>
                 <ul>
                   <li><strong>Bid:</strong> Type digits, press Enter</li>
-                  <li><strong>Select robot:</strong> Tab / Shift+Tab or click a badge</li>
+                  <li><strong>Select robot:</strong> Tab / Shift+Tab, Space, or click a badge</li>
                   <li><strong>Move:</strong> Arrow keys or W/A/S/D</li>
                   <li><strong>Clear bid:</strong> Esc</li>
+                  <li><strong>Board focus:</strong> Click board or Tab to it</li>
+                  <li><strong>Exit board:</strong> Esc when board is focused</li>
                 </ul>
               </details>
             </div>
@@ -260,8 +572,15 @@
           <div class="status">
             Status: <span id="status">—</span> (state version <span id="state-version">0</span>)
           </div>
-          <div class="timer">
-            Time Remaining: <span id="remaining">—</span>
+          <div class="timer-container">
+            <div class="timer-label">Time Remaining</div>
+            <div class="timer-display" id="timer-display" aria-live="polite" aria-label="Time remaining">—</div>
+            <div class="timer-bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="60" aria-label="Countdown progress">
+              <div class="timer-progress" id="timer-progress"></div>
+            </div>
+          </div>
+          <div id="current-target" class="current-target">
+            <div class="target-placeholder">No target selected</div>
           </div>
           <div>
             Lowest Bid: <span id="low-bid">—</span>
@@ -292,10 +611,14 @@
       <div class="game-column game-column-right">
         <fieldset>
           <legend>Board</legend>
-          <div id="board" class="board" tabindex="0" aria-label="Ricochet Robot board">
+          <div id="board" class="board" tabindex="0" role="application" aria-label="Ricochet Robot game board. Use arrow keys to move robots. Press Tab to select different robots.">
             <div class="board-surface">
               <div id="board-grid" class="board-grid" aria-hidden="true"></div>
               <div id="robot-layer" class="robot-layer" aria-hidden="true"></div>
+            </div>
+            <div id="board-instructions" class="sr-only">
+              Use arrow keys or WASD to move the selected robot. Press Tab to cycle through robots. 
+              Press Escape to cancel current action.
             </div>
           </div>
         </fieldset>
@@ -305,6 +628,10 @@
   </div>
 
   <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
+  
+  <!-- Accessibility announcements -->
+  <div id="aria-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="aria-urgent" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
 
   <script>
     (function () {
@@ -420,12 +747,15 @@
 
       const statusEl = document.getElementById('status');
       const versionEl = document.getElementById('state-version');
-      const remainingEl = document.getElementById('remaining');
+      // remainingEl removed - using timerDisplayEl instead
+      const timerDisplayEl = document.getElementById('timer-display');
+      const timerProgressEl = document.getElementById('timer-progress');
       const lowBidEl = document.getElementById('low-bid');
       const lowBidderEl = document.getElementById('low-bidder');
       const leadingPanel = document.getElementById('leading-info');
       const leadingText = document.getElementById('leading-text');
       const leaderboardEl = document.getElementById('leaderboard');
+      const bidLadderListEl = document.getElementById('bid-ladder-list');
       const verifyingContainer = document.getElementById('verifying-container');
       const verifyingCurrent = document.getElementById('verifying-current');
       const verifyingQueueList = document.getElementById('verifying-queue');
@@ -463,10 +793,10 @@
       const BOARD_SIZE = 16;
       const ROBOT_ORDER = ['Purple', 'Blue', 'Green', 'Yellow'];
       const ROBOT_META = {
-        Purple: { id: 'purple', robotClass: 'robot-purple', badgeClass: 'robot-badge-purple', shortLabel: 'P' },
-        Blue: { id: 'cyan', robotClass: 'robot-cyan', badgeClass: 'robot-badge-cyan', shortLabel: 'C' },
-        Green: { id: 'lime', robotClass: 'robot-lime', badgeClass: 'robot-badge-lime', shortLabel: 'L' },
-        Yellow: { id: 'yellow', robotClass: 'robot-yellow', badgeClass: 'robot-badge-yellow', shortLabel: 'Y' }
+        Purple: { id: 'purple', robotClass: 'robot-purple', badgeClass: 'robot-badge-purple', shortLabel: 'P', color: '#482878' },
+        Blue: { id: 'cyan', robotClass: 'robot-cyan', badgeClass: 'robot-badge-cyan', shortLabel: 'C', color: '#26828e' },
+        Green: { id: 'lime', robotClass: 'robot-lime', badgeClass: 'robot-badge-lime', shortLabel: 'L', color: '#90d743' },
+        Yellow: { id: 'yellow', robotClass: 'robot-yellow', badgeClass: 'robot-badge-yellow', shortLabel: 'Y', color: '#fde725' }
       };
 
       const INITIAL_ROBOT_POSITIONS = {
@@ -564,6 +894,24 @@
       let boardActive = false;
       let robotIdx = 0;
       let toastTimeoutId = null;
+      
+      // Game state management
+      let gameMode = 'bidding'; // 'bidding', 'demo', 'thinking'
+      let sandboxState = null; // Private state for thinking mode
+      let moveHistory = []; // For undo/redo
+      let currentTarget = null; // Current target chip
+      let demoMode = false; // Whether we're in demonstration mode
+      let demoMoves = []; // Moves being demonstrated
+      let demoStep = 0; // Current step in demo
+      let demoPlayerId = null; // Player ID of the demonstrator
+      let isDemoPlayer = false; // Whether current player is the demonstrator
+      
+      // Mobile controls
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchEndX = 0;
+      let touchEndY = 0;
+      let minSwipeDistance = 50;
 
       function setMessage(element, text, isError) {
         if (!element) {
@@ -705,8 +1053,8 @@
 
       function maybeShowShareBanner(code) {
         console.log('maybeShowShareBanner called with:', { code, shareBanner: !!shareBanner, shareBannerDisplayed, shouldShowShareBanner, userDismissedBanner });
-        if (!shareBanner || shareBannerDisplayed || !shouldShowShareBanner || userDismissedBanner) {
-          console.log('maybeShowShareBanner: not showing banner, conditions:', { shareBanner: !!shareBanner, shareBannerDisplayed, shouldShowShareBanner, userDismissedBanner });
+        if (!shareBanner || shareBannerDisplayed || userDismissedBanner) {
+          console.log('maybeShowShareBanner: not showing banner, conditions:', { shareBanner: !!shareBanner, shareBannerDisplayed, userDismissedBanner });
           return;
         }
         const shareUrl = getShareUrl(code);
@@ -724,7 +1072,10 @@
         shareBanner.style.display = ''; // Safari fallback - remove inline style
         shareBanner.removeAttribute('aria-hidden');
         shareBannerDisplayed = true;
-        consumeCreationFlag();
+        // Only consume the creation flag if it was actually used to trigger the banner
+        if (shouldShowShareBanner) {
+          consumeCreationFlag();
+        }
       }
 
       function hideShareBanner() {
@@ -1054,12 +1405,58 @@
       function updateCountdownDisplay() {
         const remaining = estimateRemaining();
         if (remaining == null) {
-          remainingEl.textContent = '—';
+          if (timerDisplayEl) timerDisplayEl.textContent = '—';
+          if (timerProgressEl) {
+            timerProgressEl.style.width = '100%';
+            timerProgressEl.className = 'timer-progress';
+          }
           return;
         }
-        remainingEl.textContent = formatSeconds(remaining);
+        
+        const formatted = formatSeconds(remaining);
+        if (timerDisplayEl) timerDisplayEl.textContent = formatted;
+        
+        // Update progress bar
+        if (timerProgressEl) {
+          const totalTime = 60; // 60 seconds countdown
+          const progress = Math.max(0, Math.min(100, (remaining / totalTime) * 100));
+          timerProgressEl.style.width = `${progress}%`;
+          
+          // Update ARIA attributes
+          const progressBar = timerProgressEl.parentElement;
+          if (progressBar) {
+            progressBar.setAttribute('aria-valuenow', Math.round(remaining));
+            progressBar.setAttribute('aria-label', `${Math.round(remaining)} seconds remaining`);
+          }
+          
+          // Update progress bar color based on remaining time
+          timerProgressEl.className = 'timer-progress';
+          if (remaining <= 10) {
+            timerProgressEl.classList.add('critical');
+            announceUrgent(`Warning: Only ${Math.round(remaining)} seconds remaining!`);
+          } else if (remaining <= 30) {
+            timerProgressEl.classList.add('warning');
+            announceUrgent(`${Math.round(remaining)} seconds remaining`);
+          }
+        }
+        
         if (remaining <= 0) {
           stopCountdownTicker();
+          announceUrgent('Time is up! Bidding is closed.');
+        }
+      }
+
+      function announceUrgent(message) {
+        const urgentEl = document.getElementById('aria-urgent');
+        if (urgentEl) {
+          urgentEl.textContent = message;
+        }
+      }
+
+      function announcePolite(message) {
+        const politeEl = document.getElementById('aria-announcements');
+        if (politeEl) {
+          politeEl.textContent = message;
         }
       }
 
@@ -1248,6 +1645,18 @@
         }
 
         updateHostControls(state);
+        updateBidLadder(state);
+        
+        // Check if we should enter demo mode
+        if (state.status === 'verifying' && state.verifying && state.verifying.queue && state.verifying.queue.length > 0) {
+          const currentIndex = state.verifying.currentIndex || 0;
+          const currentEntry = state.verifying.queue[currentIndex];
+          if (currentEntry && currentEntry.playerId) {
+            enterDemoMode(currentEntry.playerId);
+          }
+        } else if (state.status !== 'verifying' && demoMode) {
+          exitDemoMode();
+        }
 
         if (leader && leader.playerId != null && leader.value != null) {
           const reason = leader.leaderReason || {};
@@ -1297,7 +1706,7 @@
 
         if (lastServerRemaining == null || !hasServerSkew) {
           stopCountdownTicker();
-          remainingEl.textContent = '—';
+          if (timerDisplayEl) timerDisplayEl.textContent = '—';
         } else {
           startCountdownTicker();
         }
@@ -1478,6 +1887,7 @@
             
             showRoomApp();
             setJoinGateVisible(false);
+            maybeShowShareBanner(code);
             setMessage(joinMessage, '', false);
             setJoinFormVisible(false);
             setEditIdentityVisible(true);
@@ -1586,6 +1996,12 @@
         });
       } else {
         console.log('No auto-join context or already scheduled');
+      }
+
+      // Show share banner if we have a room code (either from created=1 or just visiting a room)
+      if (initialRoomCode) {
+        console.log('Page loaded with room code, showing share banner');
+        maybeShowShareBanner(initialRoomCode);
       }
 
       bidForm.addEventListener('submit', function (event) {
@@ -1757,6 +2173,7 @@
 
           window.PollingHelpers.startNextRound(currentRoomCode, currentPlayerId).then(function () {
             setMessage(nextMessage, 'Next round requested.', false);
+            resetGameForNextRound();
           }).catch(function (err) {
             console.error(err);
             const message = err && err.message ? err.message : 'Unable to start next round.';
@@ -2039,6 +2456,7 @@
             const isCurrent = badge.dataset.robot === currentName;
             badge.classList.toggle('is-selected', isCurrent);
             badge.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
+            badge.setAttribute('aria-label', `${badge.dataset.robot} robot${isCurrent ? ' (selected)' : ''}`);
           });
         }
         if (robotLayerEl) {
@@ -2046,12 +2464,19 @@
             const isCurrent = robotEl.dataset.robot === currentName;
             robotEl.classList.toggle('is-selected', isCurrent);
             robotEl.setAttribute('aria-current', isCurrent ? 'true' : 'false');
+            
+            const state = robotState[robotEl.dataset.robot];
+            if (state) {
+              robotEl.setAttribute('aria-label', 
+                `${robotEl.dataset.robot} robot at row ${state.row}, column ${state.col}${isCurrent ? ' (selected)' : ''}`);
+            }
           });
         }
         if (boardSelectionEl) {
           if (currentName && robotState[currentName]) {
             const pos = robotState[currentName];
             boardSelectionEl.textContent = `Selected robot: ${currentName} (${pos.row}, ${pos.col})`;
+            announcePolite(`Selected ${currentName} robot at position ${pos.row}, ${pos.col}`);
           } else {
             boardSelectionEl.textContent = 'Selected robot: —';
           }
@@ -2138,19 +2563,495 @@
         return { row: nextRow, col: nextCol };
       }
 
+      // Enhanced movement system for Ricochet Robot
+      function validateMove(robotName, direction) {
+        const state = robotState[robotName];
+        if (!state) return false;
+        
+        const next = computeSlide(state.row, state.col, direction, robotName);
+        return next.row !== state.row || next.col !== state.col;
+      }
+
+      function executeMove(robotName, direction, isDemo = false) {
+        const state = robotState[robotName];
+        if (!state) return false;
+        
+        const startPos = { row: state.row, col: state.col };
+        const endPos = computeSlide(state.row, state.col, direction, robotName);
+        
+        if (startPos.row === endPos.row && startPos.col === endPos.col) {
+          return false; // No movement possible
+        }
+        
+        // Save to history for undo/redo (only in thinking mode)
+        if (!isDemo && gameMode === 'thinking') {
+          moveHistory.push({
+            robot: robotName,
+            from: { ...startPos },
+            to: { ...endPos },
+            direction: direction
+          });
+        }
+        
+        state.row = endPos.row;
+        state.col = endPos.col;
+        
+        if (!isDemo) {
+          renderRobots();
+          updateSelectedRobotStyles();
+        }
+        
+        return true;
+      }
+
+      function checkTargetReached(robotName) {
+        if (!currentTarget) return false;
+        
+        const state = robotState[robotName];
+        if (!state) return false;
+        
+        // Check if robot is on the target cell
+        return state.row === currentTarget.row && state.col === currentTarget.col;
+      }
+
+      function getRobotAt(row, col) {
+        for (const [name, state] of Object.entries(robotState)) {
+          if (state.row === row && state.col === col) {
+            return name;
+          }
+        }
+        return null;
+      }
+
+      // Thinking mode and sandbox functionality
+      function enterThinkingMode() {
+        if (gameMode === 'thinking') return;
+        
+        // Save current state as sandbox
+        sandboxState = JSON.parse(JSON.stringify(robotState));
+        moveHistory = [];
+        gameMode = 'thinking';
+        updateGameModeUI();
+      }
+
+      function exitThinkingMode() {
+        if (gameMode !== 'thinking') return;
+        
+        // Restore original state
+        robotState = JSON.parse(JSON.stringify(sandboxState));
+        moveHistory = [];
+        gameMode = 'bidding';
+        updateGameModeUI();
+        renderRobots();
+        updateSelectedRobotStyles();
+      }
+
+      function resetSandbox() {
+        if (gameMode !== 'thinking') return;
+        
+        robotState = JSON.parse(JSON.stringify(sandboxState));
+        moveHistory = [];
+        renderRobots();
+        updateSelectedRobotStyles();
+      }
+
+      function undoMove() {
+        if (gameMode !== 'thinking' || moveHistory.length === 0) return;
+        
+        const lastMove = moveHistory.pop();
+        const state = robotState[lastMove.robot];
+        if (state) {
+          state.row = lastMove.from.row;
+          state.col = lastMove.from.col;
+          renderRobots();
+          updateSelectedRobotStyles();
+        }
+      }
+
+      function redoMove() {
+        // For now, redo is not implemented (would require a separate redo stack)
+        // This could be added later if needed
+      }
+
+      function updateGameModeUI() {
+        // Update UI to reflect current game mode
+        const modeIndicator = document.getElementById('game-mode-indicator');
+        if (modeIndicator) {
+          modeIndicator.textContent = `Mode: ${gameMode}`;
+        }
+        
+        // Show/hide sandbox controls
+        const sandboxControls = document.getElementById('sandbox-controls');
+        if (sandboxControls) {
+          sandboxControls.hidden = gameMode !== 'thinking';
+        }
+        
+        // Show/hide demo controls
+        const demoControls = document.getElementById('demo-controls');
+        if (demoControls) {
+          demoControls.hidden = !demoMode;
+        }
+      }
+
+      function updateBidLadder(state) {
+        if (!bidLadderListEl) return;
+        
+        const bids = state.bids || [];
+        const currentLow = state.currentLow;
+        const currentLowBy = state.currentLowBy;
+        
+        // Group bids by value and sort
+        const bidGroups = {};
+        bids.forEach(bid => {
+          const value = bid.value;
+          if (!bidGroups[value]) {
+            bidGroups[value] = [];
+          }
+          bidGroups[value].push(bid);
+        });
+        
+        // Sort by value (ascending)
+        const sortedValues = Object.keys(bidGroups).sort((a, b) => parseInt(a) - parseInt(b));
+        
+        bidLadderListEl.innerHTML = '';
+        
+        if (sortedValues.length === 0) {
+          const emptyItem = document.createElement('div');
+          emptyItem.className = 'bid-ladder-item';
+          emptyItem.innerHTML = '<span class="bid-ladder-player">No bids yet</span>';
+          bidLadderListEl.appendChild(emptyItem);
+          return;
+        }
+        
+        sortedValues.forEach(value => {
+          const group = bidGroups[value];
+          const isLeading = parseInt(value) === currentLow;
+          const isTie = group.length > 1;
+          
+          group.forEach((bid, index) => {
+            const item = document.createElement('div');
+            item.className = 'bid-ladder-item';
+            
+            if (isLeading) {
+              item.classList.add('leading');
+            }
+            if (isTie) {
+              item.classList.add('tie');
+            }
+            if (bid.playerId === currentPlayerId) {
+              item.classList.add('you');
+            }
+            
+            const playerName = formatPlayerLabel(bid.playerId);
+            const displayName = isTie ? `${playerName} (${index + 1})` : playerName;
+            
+            item.innerHTML = `
+              <span class="bid-ladder-player">${displayName}</span>
+              <span class="bid-ladder-value">${value}</span>
+            `;
+            
+            bidLadderListEl.appendChild(item);
+          });
+        });
+      }
+
+      // Demo Mode functions
+      function enterDemoMode(demonstratorPlayerId) {
+        demoMode = true;
+        demoPlayerId = demonstratorPlayerId;
+        isDemoPlayer = currentPlayerId === demonstratorPlayerId;
+        gameMode = 'demo';
+        demoMoves = [];
+        demoStep = 0;
+        
+        updateGameModeUI();
+        updateDemoControls();
+        
+        if (isDemoPlayer) {
+          showToast('You are demonstrating your solution. Use the board to show your moves.', false);
+        } else {
+          showToast(`${formatPlayerLabel(demonstratorPlayerId)} is demonstrating their solution.`, false);
+        }
+      }
+
+      function exitDemoMode() {
+        demoMode = false;
+        demoPlayerId = null;
+        isDemoPlayer = false;
+        gameMode = 'bidding';
+        demoMoves = [];
+        demoStep = 0;
+        
+        updateGameModeUI();
+        updateDemoControls();
+      }
+
+      function updateDemoControls() {
+        const demoControls = document.getElementById('demo-controls');
+        if (!demoControls) return;
+        
+        demoControls.hidden = !demoMode;
+        
+        if (demoMode) {
+          const startBtn = document.getElementById('start-demo');
+          const nextBtn = document.getElementById('next-demo-step');
+          const prevBtn = document.getElementById('prev-demo-step');
+          const endBtn = document.getElementById('end-demo');
+          
+          if (startBtn) startBtn.hidden = !isDemoPlayer || demoMoves.length > 0;
+          if (nextBtn) nextBtn.hidden = !isDemoPlayer || demoStep >= demoMoves.length;
+          if (prevBtn) prevBtn.hidden = !isDemoPlayer || demoStep <= 0;
+          if (endBtn) endBtn.hidden = !isDemoPlayer;
+        }
+      }
+
+      function startDemo() {
+        if (!isDemoPlayer || demoMode !== 'demo') return;
+        
+        // Switch to thinking mode to record moves
+        gameMode = 'thinking';
+        moveHistory = [];
+        demoMoves = [];
+        updateGameModeUI();
+        showToast('Record your moves. Click "End Demo" when finished.', false);
+      }
+
+      function endDemo() {
+        if (!isDemoPlayer || gameMode !== 'thinking') return;
+        
+        // Convert move history to demo moves
+        demoMoves = [...moveHistory];
+        gameMode = 'demo';
+        demoStep = 0;
+        
+        updateGameModeUI();
+        updateDemoControls();
+        
+        if (demoMoves.length === 0) {
+          showToast('No moves recorded. Try again.', true);
+          return;
+        }
+        
+        showToast(`Recorded ${demoMoves.length} moves. Click "Next" to demonstrate.`, false);
+      }
+
+      function nextDemoStep() {
+        if (!isDemoPlayer || demoStep >= demoMoves.length) return;
+        
+        const move = demoMoves[demoStep];
+        executeMove(move.robot, move.direction, true);
+        demoStep++;
+        
+        updateDemoControls();
+        
+        if (demoStep >= demoMoves.length) {
+          // Check if target was reached
+          if (checkTargetReached(move.robot)) {
+            showToast('Solution successful! Target reached.', false);
+            awardChipToPlayer(demoPlayerId);
+          } else {
+            showToast('Solution failed. Target not reached.', true);
+            // Move to next player in verification queue
+            advanceVerificationQueue();
+          }
+        }
+      }
+
+      function prevDemoStep() {
+        if (!isDemoPlayer || demoStep <= 0) return;
+        
+        demoStep--;
+        const move = demoMoves[demoStep];
+        
+        // Undo the move
+        const state = robotState[move.robot];
+        if (state) {
+          state.row = move.from.row;
+          state.col = move.from.col;
+          renderRobots();
+          updateSelectedRobotStyles();
+        }
+        
+        updateDemoControls();
+      }
+
+      // Award and scoreboard functions
+      function awardChipToPlayer(playerId) {
+        if (!playerId) return;
+        
+        // Update local player data
+        if (playersById[playerId]) {
+          playersById[playerId].tokensWon = (playersById[playerId].tokensWon || 0) + 1;
+        }
+        
+        // Show celebration animation
+        showCelebrationAnimation();
+        
+        // Update scoreboard
+        updateScoreboard();
+        
+        // Notify server (this would be handled by the verification system)
+        showToast(`${formatPlayerLabel(playerId)} won a chip!`, false);
+        
+        // End demo mode and move to next round
+        setTimeout(() => {
+          exitDemoMode();
+          // TODO: Trigger next round or move to next verification
+        }, 2000);
+      }
+
+      function showCelebrationAnimation() {
+        // Simple celebration - could be enhanced with confetti, etc.
+        const board = document.getElementById('board');
+        if (board) {
+          board.style.animation = 'celebrate 0.6s ease-in-out';
+          setTimeout(() => {
+            board.style.animation = '';
+          }, 600);
+        }
+      }
+
+      function updateScoreboard() {
+        // Update the leaderboard display
+        if (leaderboardEl) {
+          leaderboardEl.innerHTML = '';
+          const sortedPlayers = Object.values(playersById).sort((a, b) => (b.tokensWon || 0) - (a.tokensWon || 0));
+          
+          sortedPlayers.forEach(player => {
+            const tr = document.createElement('tr');
+            
+            const nameCell = document.createElement('td');
+            let playerName = formatPlayerLabel(player.playerId);
+            if (hostPlayerId != null && player.playerId === hostPlayerId) {
+              playerName += ' (Host)';
+            }
+            nameCell.textContent = playerName;
+            
+            const bidCell = document.createElement('td');
+            bidCell.textContent = '—'; // No current bid in scoreboard
+            
+            const tokensCell = document.createElement('td');
+            tokensCell.textContent = player.tokensWon || 0;
+            tokensCell.style.fontWeight = 'bold';
+            tokensCell.style.color = '#10b981';
+            
+            tr.appendChild(nameCell);
+            tr.appendChild(bidCell);
+            tr.appendChild(tokensCell);
+            leaderboardEl.appendChild(tr);
+          });
+        }
+      }
+
+      function advanceVerificationQueue() {
+        // This would typically be handled by the server
+        // For now, just show a message
+        showToast('Moving to next player in verification queue...', false);
+        
+        // TODO: Call server API to advance verification queue
+        // This would trigger the next player's demo mode
+      }
+
+      function resetGameForNextRound() {
+        // Reset robots to initial positions
+        initializeRobots();
+        renderRobots();
+        updateSelectedRobotStyles();
+        
+        // Select new random target
+        selectRandomTarget();
+        
+        // Reset game state
+        exitDemoMode();
+        exitThinkingMode();
+        
+        // Clear any existing state
+        moveHistory = [];
+        demoMoves = [];
+        demoStep = 0;
+        
+        showToast('New round started!', false);
+      }
+
+      // Mobile control functions
+      function handleTouchStart(event) {
+        if (event.touches.length !== 1) return;
+        
+        const touch = event.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+      }
+
+      function handleTouchEnd(event) {
+        if (event.changedTouches.length !== 1) return;
+        
+        const touch = event.changedTouches[0];
+        touchEndX = touch.clientX;
+        touchEndY = touch.clientY;
+        
+        handleSwipe();
+      }
+
+      function handleSwipe() {
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        if (distance < minSwipeDistance) return;
+        
+        let direction = null;
+        
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          // Horizontal swipe
+          direction = deltaX > 0 ? 'RIGHT' : 'LEFT';
+        } else {
+          // Vertical swipe
+          direction = deltaY > 0 ? 'DOWN' : 'UP';
+        }
+        
+        if (direction) {
+          slideSelectedRobot(direction);
+        }
+      }
+
+      function handleRadialPadClick(event) {
+        const target = event.target.closest('.radial-pad-direction');
+        if (!target) return;
+        
+        const direction = target.getAttribute('data-dir');
+        if (direction) {
+          slideSelectedRobot(direction);
+        }
+      }
+
+      function initMobileControls() {
+        const board = document.getElementById('board');
+        const radialPad = document.getElementById('radial-pad');
+        
+        if (board) {
+          board.addEventListener('touchstart', handleTouchStart, { passive: true });
+          board.addEventListener('touchend', handleTouchEnd, { passive: true });
+        }
+        
+        if (radialPad) {
+          radialPad.addEventListener('click', handleRadialPadClick);
+        }
+      }
+
       function slideSelectedRobot(direction) {
         const currentName = ROBOT_ORDER[robotIdx];
-        const state = robotState[currentName];
-        if (!state) {
-          return;
+        if (gameMode === 'demo' && !demoMode) {
+          return; // Can't move during demo unless we're the demonstrator
         }
-        const next = computeSlide(state.row, state.col, direction, currentName);
-        if (next.row === state.row && next.col === state.col) {
-          return;
+        
+        if (gameMode === 'bidding' && !demoMode) {
+          // In bidding mode, switch to thinking mode for private sandbox
+          if (gameMode !== 'thinking') {
+            enterThinkingMode();
+          }
         }
-        state.row = next.row;
-        state.col = next.col;
-        renderRobots();
+        
+        executeMove(currentName, direction);
       }
 
       function handleBoardKeydown(event) {
@@ -2161,12 +3062,19 @@
           if (boardEl) {
             boardEl.blur();
           }
+          announcePolite('Exited board focus');
           return;
         }
         if (event.key === 'Tab') {
           event.preventDefault();
           const delta = event.shiftKey ? -1 : 1;
           selectRobotByIndex(robotIdx + delta);
+          return;
+        }
+        if (event.key === ' ') {
+          event.preventDefault();
+          // Space bar cycles through robots
+          selectRobotByIndex(robotIdx + 1);
           return;
         }
         const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
@@ -2176,6 +3084,13 @@
         }
         event.preventDefault();
         slideSelectedRobot(direction);
+        
+        // Announce movement
+        const currentName = ROBOT_ORDER[robotIdx];
+        const state = robotState[currentName];
+        if (state) {
+          announcePolite(`Moved ${currentName} robot to row ${state.row}, column ${state.col}`);
+        }
       }
 
       function handleArrowClick(event) {
@@ -2227,6 +3142,9 @@
                 // Create 4-color square symbol
                 const symbolEl = document.createElement('div');
                 symbolEl.className = 'emoji-target quad-symbol';
+                symbolEl.dataset.row = position.row;
+                symbolEl.dataset.col = position.col;
+                symbolEl.dataset.symbol = 'QUAD';
                 
                 // Create 4 small squares
                 const colors = ["#482878", "#90d743", "#fde725", "#26828e"]; // I, L, Y, C
@@ -2248,12 +3166,104 @@
                 symbolEl.textContent = symbolMap[shape];
                 symbolEl.style.color = colorMap[color];
                 symbolEl.setAttribute('data-symbol-suit', shape);
+                symbolEl.dataset.row = position.row;
+                symbolEl.dataset.col = position.col;
+                symbolEl.dataset.symbol = symbolCode;
                 
                 cell.appendChild(symbolEl);
               }
             }
           });
         });
+      }
+
+      function setCurrentTarget(symbol) {
+        currentTarget = symbol;
+        updateTargetDisplay();
+        highlightCurrentTarget();
+      }
+
+      function updateTargetDisplay() {
+        const targetDisplay = document.getElementById('current-target');
+        if (!targetDisplay) return;
+        
+        if (!currentTarget) {
+          targetDisplay.innerHTML = '<div class="target-placeholder">No target selected</div>';
+          return;
+        }
+        
+        const symbolMap = {
+          "D": "♦", "H": "♥", "C": "♣", "S": "♠"
+        };
+        const colorMap = {
+          "I": "#482878", "L": "#90d743", "Y": "#fde725", "C": "#26828e"
+        };
+        
+        if (currentTarget.symbol === 'QUAD') {
+          targetDisplay.innerHTML = `
+            <div class="target-quad">
+              <div class="quad-symbol">
+                <div class="quad-square" style="background: #482878;"></div>
+                <div class="quad-square" style="background: #90d743;"></div>
+                <div class="quad-square" style="background: #fde725;"></div>
+                <div class="quad-square" style="background: #26828e;"></div>
+              </div>
+              <div class="target-label">Any Robot</div>
+            </div>
+          `;
+        } else {
+          const shape = currentTarget.symbol[0];
+          const color = currentTarget.symbol[1];
+          targetDisplay.innerHTML = `
+            <div class="target-single">
+              <span class="target-symbol" style="color: ${colorMap[color]}">${symbolMap[shape]}</span>
+              <div class="target-label">${getRobotNameForColor(color)} Robot</div>
+            </div>
+          `;
+        }
+      }
+
+      function getRobotNameForColor(colorCode) {
+        const colorMap = {
+          "I": "Purple", "L": "Lime", "Y": "Yellow", "C": "Cyan"
+        };
+        return colorMap[colorCode] || "Unknown";
+      }
+
+      function highlightCurrentTarget() {
+        // Remove existing highlights
+        boardGridEl.querySelectorAll('.target-highlight').forEach(el => {
+          el.classList.remove('target-highlight');
+        });
+        
+        if (!currentTarget) return;
+        
+        const cell = boardGridEl.querySelector(`.board-cell[data-row="${currentTarget.row}"][data-col="${currentTarget.col}"]`);
+        if (cell) {
+          cell.classList.add('target-highlight');
+        }
+      }
+
+      function selectRandomTarget() {
+        // Collect all available symbols
+        const allSymbols = [];
+        Object.values(SYMBOL_POSITIONS).forEach(positions => {
+          positions.forEach(position => {
+            allSymbols.push({
+              row: position.row,
+              col: position.col,
+              symbol: position.symbol
+            });
+          });
+        });
+        
+        if (allSymbols.length === 0) return;
+        
+        // Select a random target
+        const randomIndex = Math.floor(Math.random() * allSymbols.length);
+        const selectedSymbol = allSymbols[randomIndex];
+        
+        setCurrentTarget(selectedSymbol);
       }
 
       function initBoard() {
@@ -2274,6 +3284,8 @@
         initializeRobots();
         renderRobotBadges();
         renderRobots();
+        selectRandomTarget();
+        initMobileControls();
         boardEl.addEventListener('focus', function () {
           boardActive = true;
           boardEl.classList.add('is-focused');
@@ -2303,6 +3315,45 @@
 
       if (toastEl) {
         toastEl.addEventListener('click', hideToast);
+      }
+
+      // Sandbox control event listeners
+      const resetSandboxBtn = document.getElementById('reset-sandbox');
+      const undoMoveBtn = document.getElementById('undo-move');
+      const exitThinkingBtn = document.getElementById('exit-thinking');
+
+      if (resetSandboxBtn) {
+        resetSandboxBtn.addEventListener('click', resetSandbox);
+      }
+
+      if (undoMoveBtn) {
+        undoMoveBtn.addEventListener('click', undoMove);
+      }
+
+      if (exitThinkingBtn) {
+        exitThinkingBtn.addEventListener('click', exitThinkingMode);
+      }
+
+      // Demo control event listeners
+      const startDemoBtn = document.getElementById('start-demo');
+      const nextDemoStepBtn = document.getElementById('next-demo-step');
+      const prevDemoStepBtn = document.getElementById('prev-demo-step');
+      const endDemoBtn = document.getElementById('end-demo');
+
+      if (startDemoBtn) {
+        startDemoBtn.addEventListener('click', startDemo);
+      }
+
+      if (nextDemoStepBtn) {
+        nextDemoStepBtn.addEventListener('click', nextDemoStep);
+      }
+
+      if (prevDemoStepBtn) {
+        prevDemoStepBtn.addEventListener('click', prevDemoStep);
+      }
+
+      if (endDemoBtn) {
+        endDemoBtn.addEventListener('click', endDemo);
       }
 
       async function postJson(url, payload) {
