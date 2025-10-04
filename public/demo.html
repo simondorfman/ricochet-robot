@@ -11,6 +11,17 @@
     label { display: block; margin-bottom: 0.5rem; }
     input, select, button { padding: 0.5rem; font-size: 1rem; }
     .status { font-size: 1.25rem; margin: 0.5rem 0; }
+    
+    .puzzle-progress {
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #059669;
+      background: #d1fae5;
+      padding: 0.5rem;
+      border-radius: 0.375rem;
+      text-align: center;
+    }
     .timer { font-size: 2rem; font-weight: bold; }
     ul { padding-left: 1.5rem; }
     .columns { display: flex; flex-wrap: wrap; gap: 1.5rem; }
@@ -208,17 +219,33 @@
       padding: 0.4rem 0.8rem;
     }
     
-    .demo-controls {
+    .demonstration-controls {
       display: flex;
       gap: 0.5rem;
       margin-top: 0.75rem;
       flex-wrap: wrap;
+      align-items: center;
     }
     
-    .demo-controls button {
+    .demonstration-controls button {
       font-size: 0.9rem;
       padding: 0.4rem 0.8rem;
     }
+    
+    .move-counter {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: white;
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      padding: 1rem 1.5rem;
+      border-radius: 1rem;
+      border: 3px solid #2980b9;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      text-align: center;
+      min-width: 120px;
+      margin-bottom: 1rem;
+    }
+    
     
     .mobile-controls {
       display: none;
@@ -534,11 +561,10 @@
                 <button type="button" id="undo-move" class="secondary">Undo</button>
                 <button type="button" id="exit-thinking" class="secondary">Exit Thinking</button>
               </div>
-              <div id="demo-controls" class="demo-controls" hidden>
-                <button type="button" id="start-demo" class="primary">Start Demo</button>
-                <button type="button" id="next-demo-step" class="secondary">Next Step</button>
-                <button type="button" id="prev-demo-step" class="secondary">Prev Step</button>
-                <button type="button" id="end-demo" class="secondary">End Demo</button>
+              <div id="demonstration-controls" class="demonstration-controls" hidden>
+                <div id="move-counter" class="move-counter">Moves: 0</div>
+                <button type="button" id="submit-solution" class="primary">Submit Solution</button>
+                <button type="button" id="give-up" class="secondary">Give Up</button>
               </div>
               <div id="mobile-controls" class="mobile-controls">
                 <div class="radial-pad" id="radial-pad">
@@ -571,6 +597,9 @@
           <legend>Current Round</legend>
           <div class="status">
             Status: <span id="status">—</span> (state version <span id="state-version">0</span>)
+          </div>
+          <div class="puzzle-progress">
+            Puzzle <span id="current-puzzle">1</span> of <span id="total-puzzles">17</span>
           </div>
           <div class="timer-container">
             <div class="timer-label">Time Remaining</div>
@@ -896,10 +925,14 @@
       let toastTimeoutId = null;
       
       // Game state management
-      let gameMode = 'bidding'; // 'bidding', 'demo', 'thinking'
+      let gameMode = 'bidding'; // 'bidding', 'demo', 'thinking', 'demonstrating'
       let sandboxState = null; // Private state for thinking mode
       let moveHistory = []; // For undo/redo
       let currentTarget = null; // Current target chip
+      let demonstrationMoves = 0; // Move counter during solution demonstration
+      let currentPuzzleNumber = 1; // Track current puzzle (1-17)
+      let totalPuzzles = 17; // Total number of puzzles in the game
+      let currentPlayerBid = null; // Current player's bid during demonstration
       let demoMode = false; // Whether we're in demonstration mode
       let demoMoves = []; // Moves being demonstrated
       let demoStep = 0; // Current step in demo
@@ -1513,6 +1546,43 @@
         lastStateSnapshot = state;
         statusEl.textContent = state.status;
         versionEl.textContent = state.stateVersion;
+        
+        // Load robot positions from server state
+        console.log('State robotPositions:', state.robotPositions);
+        if (state.robotPositions && typeof state.robotPositions === 'object') {
+          console.log('Loading robot positions from server:', state.robotPositions);
+          // Update robot positions from server
+          for (const [robotName, position] of Object.entries(state.robotPositions)) {
+            if (position && typeof position === 'object' && 
+                typeof position.row === 'number' && typeof position.col === 'number') {
+              robotState[robotName] = { row: position.row, col: position.col };
+              console.log(`Set ${robotName} to position:`, position);
+            }
+          }
+          renderRobots();
+          updateSelectedRobotStyles();
+        } else if (Object.keys(robotState).length === 0) {
+          console.log('No server robot positions, initializing locally');
+          // Initialize robots only if we have no server data and no local data
+          initializeRobots();
+          renderRobots();
+          updateSelectedRobotStyles();
+        }
+        
+        // Load current target from server state
+        console.log('State currentTarget:', state.currentTarget);
+        if (state.currentTarget && typeof state.currentTarget === 'object') {
+          console.log('Loading target from server:', state.currentTarget);
+          currentTarget = {
+            row: state.currentTarget.row,
+            col: state.currentTarget.col,
+            symbol: state.currentTarget.symbol
+          };
+          renderTarget();
+        } else {
+          console.log('No server target, currentTarget is:', currentTarget);
+        }
+        
         const playersState = state.players && typeof state.players === 'object' ? state.players : {};
         const nextPlayers = {};
         Object.keys(playersState).forEach(function (key) {
@@ -1647,15 +1717,23 @@
         updateHostControls(state);
         updateBidLadder(state);
         
-        // Check if we should enter demo mode
+        // Check if we should enter demonstration mode
         if (state.status === 'verifying' && state.verifying && state.verifying.queue && state.verifying.queue.length > 0) {
           const currentIndex = state.verifying.currentIndex || 0;
           const currentEntry = state.verifying.queue[currentIndex];
           if (currentEntry && currentEntry.playerId) {
-            enterDemoMode(currentEntry.playerId);
+            // Check if the current player is the one who should demonstrate
+            if (currentEntry.playerId === currentPlayerId) {
+              startDemonstration(currentEntry.playerId, currentEntry.value);
+            } else {
+              // Show message that someone else is demonstrating
+              showToast(`${currentEntry.displayName || 'Player ' + currentEntry.playerId} is demonstrating their solution...`, false);
+            }
           }
-        } else if (state.status !== 'verifying' && demoMode) {
-          exitDemoMode();
+        } else if (state.status !== 'verifying' && gameMode === 'demonstrating') {
+          // Exit demonstration mode if verification is complete
+          gameMode = 'bidding';
+          updateGameModeUI();
         }
 
         if (leader && leader.playerId != null && leader.value != null) {
@@ -1839,6 +1917,17 @@
               setJoinFormVisible(true);
             }
             setEditIdentityVisible(false);
+            
+            // Try to get more details about the error
+            if (err && err.response) {
+              console.log('Error response:', err.response);
+              try {
+                const errorData = JSON.parse(err.response);
+                console.log('Parsed error data:', errorData);
+              } catch (e) {
+                console.log('Could not parse error response as JSON');
+              }
+            }
             hideJoinStatusBanner();
             setMessage(joinMessage, message, true);
             showToast(message, true);
@@ -2003,6 +2092,9 @@
         console.log('Page loaded with room code, showing share banner');
         maybeShowShareBanner(initialRoomCode);
       }
+
+      // Initialize puzzle progress
+      updatePuzzleProgress();
 
       bidForm.addEventListener('submit', function (event) {
         event.preventDefault();
@@ -2395,6 +2487,7 @@
           const state = robotState[name];
           const meta = ROBOT_META[name];
           if (!state || !meta) {
+            console.log(`Skipping robot ${name}: state=${!!state}, meta=${!!meta}`);
             return;
           }
           const robotEl = document.createElement('div');
@@ -2583,6 +2676,12 @@
           return false; // No movement possible
         }
         
+        // Count moves during demonstration
+        if (gameMode === 'demonstrating' && !isDemo) {
+          demonstrationMoves++;
+          updateMoveCounter();
+        }
+        
         // Save to history for undo/redo (only in thinking mode)
         if (!isDemo && gameMode === 'thinking') {
           moveHistory.push({
@@ -2674,23 +2773,119 @@
       }
 
       function updateGameModeUI() {
-        // Update UI to reflect current game mode
-        const modeIndicator = document.getElementById('game-mode-indicator');
-        if (modeIndicator) {
-          modeIndicator.textContent = `Mode: ${gameMode}`;
-        }
-        
-        // Show/hide sandbox controls
-        const sandboxControls = document.getElementById('sandbox-controls');
-        if (sandboxControls) {
-          sandboxControls.hidden = gameMode !== 'thinking';
-        }
-        
-        // Show/hide demo controls
+      // Update UI to reflect current game mode
+      const modeIndicator = document.getElementById('game-mode-indicator');
+      if (modeIndicator) {
+        modeIndicator.textContent = `Mode: ${gameMode}`;
+      }
+      
+      // Show/hide sandbox controls
+      const sandboxControls = document.getElementById('sandbox-controls');
+      if (sandboxControls) {
+        sandboxControls.hidden = gameMode !== 'thinking';
+      }
+      
+      // Show/hide demonstration controls
+      const demonstrationControls = document.getElementById('demonstration-controls');
+      if (demonstrationControls) {
+        demonstrationControls.hidden = gameMode !== 'demonstrating';
+      }
+      
+      // Show/hide demo controls
         const demoControls = document.getElementById('demo-controls');
         if (demoControls) {
           demoControls.hidden = !demoMode;
         }
+      }
+
+      function updatePuzzleProgress() {
+        const currentPuzzleEl = document.getElementById('current-puzzle');
+        const totalPuzzlesEl = document.getElementById('total-puzzles');
+        
+        if (currentPuzzleEl) {
+          currentPuzzleEl.textContent = currentPuzzleNumber;
+        }
+        if (totalPuzzlesEl) {
+          totalPuzzlesEl.textContent = totalPuzzles;
+        }
+      }
+
+      function updateMoveCounter() {
+        const moveCounterEl = document.getElementById('move-counter');
+        if (moveCounterEl) {
+          if (currentPlayerBid !== null) {
+            moveCounterEl.innerHTML = `
+              <div style="font-size: 1.2rem; margin-bottom: 0.25rem;">Moves: ${demonstrationMoves}</div>
+              <div style="font-size: 0.9rem; opacity: 0.9;">Bid: ${currentPlayerBid}</div>
+            `;
+          } else {
+            moveCounterEl.textContent = `Moves: ${demonstrationMoves}`;
+          }
+        }
+      }
+
+      function startDemonstration(playerId, playerBid) {
+        console.log(`Starting demonstration for player ${playerId} with bid ${playerBid}`);
+        gameMode = 'demonstrating';
+        demonstrationMoves = 0;
+        currentPlayerBid = playerBid;
+        updateGameModeUI();
+        updateMoveCounter();
+        showToast(`🎯 Your turn to demonstrate! You bid ${playerBid} moves. Show your solution!`, false);
+      }
+
+      function endDemonstration(success, playerId, playerBid) {
+        console.log(`Ending demonstration: success=${success}, player=${playerId}, bid=${playerBid}, moves=${demonstrationMoves}`);
+        
+        if (success && demonstrationMoves <= playerBid) {
+          // Success! Award point and move to next puzzle
+          showToast(`🎉 ${formatPlayerLabel(playerId)} solved it in ${demonstrationMoves} moves! (bid: ${playerBid}) - You get the point!`, false);
+          awardChipToPlayer(playerId);
+          callVerificationAPI(true); // Mark as successful
+          advanceToNextPuzzle();
+        } else {
+          // Failed - either didn't reach target or used too many moves
+          let reason;
+          if (!success) {
+            reason = "didn't reach the target";
+          } else {
+            reason = `used ${demonstrationMoves} moves (bid: ${playerBid})`;
+          }
+          showToast(`❌ ${formatPlayerLabel(playerId)} failed: ${reason}. Moving on to next bid.`, true);
+          // Call server API to mark this attempt as failed and advance to next player
+          callVerificationAPI(false);
+        }
+        
+        gameMode = 'bidding';
+        updateGameModeUI();
+      }
+
+      function advanceToNextPuzzle() {
+        currentPuzzleNumber++;
+        updatePuzzleProgress();
+        
+        if (currentPuzzleNumber > totalPuzzles) {
+          // Game over!
+          endGame();
+        } else {
+          // Start new round with new puzzle
+          resetGameForNextRound();
+          showToast(`Puzzle ${currentPuzzleNumber} of ${totalPuzzles}`, false);
+        }
+      }
+
+      function endGame() {
+        showToast('Game Over! All 17 puzzles have been solved!', false);
+        // TODO: Show final scores and winner
+        gameMode = 'complete';
+        updateGameModeUI();
+      }
+
+      function advanceVerificationQueue() {
+        // This would trigger the next player in the verification queue
+        // The server will handle advancing to the next player
+        console.log('Advancing to next player in verification queue');
+        // The polling system will pick up the next player automatically
       }
 
       function updateBidLadder(state) {
@@ -2765,7 +2960,6 @@
         demoStep = 0;
         
         updateGameModeUI();
-        updateDemoControls();
         
         if (isDemoPlayer) {
           showToast('You are demonstrating your solution. Use the board to show your moves.', false);
@@ -2783,27 +2977,8 @@
         demoStep = 0;
         
         updateGameModeUI();
-        updateDemoControls();
       }
 
-      function updateDemoControls() {
-        const demoControls = document.getElementById('demo-controls');
-        if (!demoControls) return;
-        
-        demoControls.hidden = !demoMode;
-        
-        if (demoMode) {
-          const startBtn = document.getElementById('start-demo');
-          const nextBtn = document.getElementById('next-demo-step');
-          const prevBtn = document.getElementById('prev-demo-step');
-          const endBtn = document.getElementById('end-demo');
-          
-          if (startBtn) startBtn.hidden = !isDemoPlayer || demoMoves.length > 0;
-          if (nextBtn) nextBtn.hidden = !isDemoPlayer || demoStep >= demoMoves.length;
-          if (prevBtn) prevBtn.hidden = !isDemoPlayer || demoStep <= 0;
-          if (endBtn) endBtn.hidden = !isDemoPlayer;
-        }
-      }
 
       function startDemo() {
         if (!isDemoPlayer || demoMode !== 'demo') return;
@@ -2825,7 +3000,6 @@
         demoStep = 0;
         
         updateGameModeUI();
-        updateDemoControls();
         
         if (demoMoves.length === 0) {
           showToast('No moves recorded. Try again.', true);
@@ -2943,6 +3117,54 @@
         }
       }
 
+      function callVerificationAPI(success) {
+        if (!currentRoomCode || !currentPlayerId) {
+          showToast('Error: No room or player ID', true);
+          return;
+        }
+        
+        const action = success ? 'pass' : 'fail';
+        showToast(`Marking verification as ${action}...`, false);
+        
+        // Call the verification API
+        const url = `/api/rooms/${encodeURIComponent(currentRoomCode)}/verify/${action}`;
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ playerId: currentPlayerId })
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log(`Verification ${action} successful:`, data);
+          
+          if (action === 'pass') {
+            showToast(`🎉 Verification successful! Moving to next puzzle.`, false);
+          } else {
+            // Check if this was the last player in the queue
+            if (data.queueExhausted || data.currentIndex >= data.queueLength) {
+              showToast(`❌ No successful solutions! No one gets the point. Moving to next puzzle.`, true);
+              // Move to next puzzle when queue is exhausted
+              setTimeout(() => {
+                advanceToNextPuzzle();
+              }, 2000);
+            } else {
+              showToast(`Verification marked as ${action}. Moving to next player.`, false);
+            }
+          }
+        })
+        .catch(error => {
+          console.error(`Verification ${action} failed:`, error);
+          showToast(`Failed to mark verification as ${action}: ${error.message}`, true);
+        });
+      }
+
       function advanceVerificationQueue() {
         // This would typically be handled by the server
         // For now, just show a message
@@ -2953,13 +3175,8 @@
       }
 
       function resetGameForNextRound() {
-        // Reset robots to initial positions
-        initializeRobots();
-        renderRobots();
-        updateSelectedRobotStyles();
-        
-        // Select new random target
-        selectRandomTarget();
+        // Robot positions and targets will be loaded from server state
+        // No need to reset them locally
         
         // Reset game state
         exitDemoMode();
@@ -3040,15 +3257,25 @@
 
       function slideSelectedRobot(direction) {
         const currentName = ROBOT_ORDER[robotIdx];
+        
+        // During bidding phase, players cannot move robots - they must solve mentally
+        if (gameMode === 'bidding') {
+          showToast('Think through your solution mentally, then place your bid!', true);
+          return;
+        }
+        
         if (gameMode === 'demo' && !demoMode) {
           return; // Can't move during demo unless we're the demonstrator
         }
         
-        if (gameMode === 'bidding' && !demoMode) {
-          // In bidding mode, switch to thinking mode for private sandbox
-          if (gameMode !== 'thinking') {
-            enterThinkingMode();
-          }
+        // In thinking mode, allow movement for private sandbox
+        if (gameMode === 'thinking') {
+          // Allow movement in thinking mode
+        }
+        
+        // In demonstration mode, allow movement and count moves
+        if (gameMode === 'demonstrating') {
+          // Allow movement and increment counter
         }
         
         executeMove(currentName, direction);
@@ -3184,6 +3411,7 @@
       }
 
       function updateTargetDisplay() {
+        console.log('updateTargetDisplay called, currentTarget:', currentTarget);
         const targetDisplay = document.getElementById('current-target');
         if (!targetDisplay) return;
         
@@ -3211,7 +3439,7 @@
               <div class="target-label">Any Robot</div>
             </div>
           `;
-        } else {
+        } else if (currentTarget.symbol && currentTarget.symbol.length >= 2) {
           const shape = currentTarget.symbol[0];
           const color = currentTarget.symbol[1];
           targetDisplay.innerHTML = `
@@ -3220,14 +3448,41 @@
               <div class="target-label">${getRobotNameForColor(color)} Robot</div>
             </div>
           `;
+        } else {
+          console.log('Invalid target symbol format:', currentTarget.symbol);
+          targetDisplay.innerHTML = '<div class="target-placeholder">Invalid target</div>';
         }
       }
 
       function getRobotNameForColor(colorCode) {
         const colorMap = {
-          "I": "Purple", "L": "Lime", "Y": "Yellow", "C": "Cyan"
+          "I": "Purple", "L": "Green", "Y": "Yellow", "C": "Blue"
         };
         return colorMap[colorCode] || "Unknown";
+      }
+
+      function getRobotNameForTarget(target) {
+        if (!target || !target.symbol) return null;
+        
+        if (target.symbol === 'QUAD') {
+          // For QUAD targets, any robot can reach it
+          return 'Purple'; // Default to Purple for QUAD
+        }
+        
+        if (target.symbol.length >= 2) {
+          const colorCode = target.symbol[1]; // Second character is the color
+          return getRobotNameForColor(colorCode);
+        }
+        
+        return null;
+      }
+
+      function renderTarget() {
+        console.log('renderTarget called, currentTarget:', currentTarget);
+        // Update the target display in the UI
+        updateTargetDisplay();
+        // Highlight the target on the board
+        highlightCurrentTarget();
       }
 
       function highlightCurrentTarget() {
@@ -3281,10 +3536,13 @@
         buildWallData();
         buildBoardGrid();
         placeSymbols();
-        initializeRobots();
+        
+        // Don't initialize robots here - they will be loaded from server state
+        // or initialized when the board is first set up
+        
         renderRobotBadges();
         renderRobots();
-        selectRandomTarget();
+        // Target will be loaded from server state
         initMobileControls();
         boardEl.addEventListener('focus', function () {
           boardActive = true;
@@ -3334,27 +3592,6 @@
         exitThinkingBtn.addEventListener('click', exitThinkingMode);
       }
 
-      // Demo control event listeners
-      const startDemoBtn = document.getElementById('start-demo');
-      const nextDemoStepBtn = document.getElementById('next-demo-step');
-      const prevDemoStepBtn = document.getElementById('prev-demo-step');
-      const endDemoBtn = document.getElementById('end-demo');
-
-      if (startDemoBtn) {
-        startDemoBtn.addEventListener('click', startDemo);
-      }
-
-      if (nextDemoStepBtn) {
-        nextDemoStepBtn.addEventListener('click', nextDemoStep);
-      }
-
-      if (prevDemoStepBtn) {
-        prevDemoStepBtn.addEventListener('click', prevDemoStep);
-      }
-
-      if (endDemoBtn) {
-        endDemoBtn.addEventListener('click', endDemo);
-      }
 
       async function postJson(url, payload) {
         const res = await fetch(url, {
@@ -3481,6 +3718,29 @@
           throw new Error('Room code is required.');
         }
         return await postJson(`/api/rooms/${encodeURIComponent(normalized)}/players/claim-host`, { playerId: Number(playerId) });
+      }
+
+      // Event listeners for demonstration controls
+      const submitSolutionButton = document.getElementById('submit-solution');
+      const giveUpButton = document.getElementById('give-up');
+      
+      if (submitSolutionButton) {
+        submitSolutionButton.addEventListener('click', function() {
+          if (gameMode === 'demonstrating') {
+            // Determine which robot should reach the target based on the target's color
+            const targetRobot = getRobotNameForTarget(currentTarget);
+            const targetReached = checkTargetReached(targetRobot);
+            endDemonstration(targetReached, currentPlayerId, currentPlayerBid);
+          }
+        });
+      }
+      
+      if (giveUpButton) {
+        giveUpButton.addEventListener('click', function() {
+          if (gameMode === 'demonstrating') {
+            endDemonstration(false, currentPlayerId, currentPlayerBid);
+          }
+        });
       }
 
     }());

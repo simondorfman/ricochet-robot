@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/lib/robot_positions.php';
 
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
@@ -67,11 +68,16 @@ try {
         respondJson(409, ['error' => 'Current round is not complete yet.']);
     }
 
+    // Generate robot positions for the new round
+    $robotPositions = generateRobotPositions();
+    $robotPositionsJson = json_encode($robotPositions);
+    
     $insert = $pdo->prepare(
-        "INSERT INTO rounds (room_id, status, state_version, created_at) VALUES (:room_id, 'bidding', 0, UTC_TIMESTAMP())"
+        "INSERT INTO rounds (room_id, status, state_version, robot_positions_json, created_at) VALUES (:room_id, 'bidding', 0, :robot_positions, UTC_TIMESTAMP())"
     );
     $insert->execute([
         'room_id' => $roomId,
+        'robot_positions' => $robotPositionsJson,
     ]);
 
     $newRoundId = (int) $pdo->lastInsertId();
@@ -85,6 +91,7 @@ try {
 }
 
 respondJson(200, ['ok' => true, 'roundId' => $newRoundId]);
+
 
 function respondJson(int $status, array $payload): void
 {

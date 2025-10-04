@@ -149,8 +149,15 @@ try {
 
     $pdo->commit();
     $reportedIndex = $queueCount === 0 ? 0 : min($nextIndex, $queueCount);
+    $queueExhausted = $queueCount === 0 || $nextIndex >= $queueCount;
 
-    respondJson(200, ['ok' => true, 'result' => 'fail', 'currentIndex' => $reportedIndex]);
+    respondJson(200, [
+        'ok' => true, 
+        'result' => 'fail', 
+        'currentIndex' => $reportedIndex,
+        'queueExhausted' => $queueExhausted,
+        'queueLength' => $queueCount
+    ]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

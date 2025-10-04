@@ -348,6 +348,8 @@ function startCountdown(int $roundId, int $seconds = 60): string
 {
     $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
     $endsAt = $now->modify(sprintf('+%d seconds', $seconds));
+    
+    error_log("startCountdown: now=" . $now->format('Y-m-d H:i:s') . ", endsAt=" . $endsAt->format('Y-m-d H:i:s'));
 
     $sql = <<<SQL
 UPDATE rounds
@@ -530,10 +532,10 @@ SELECT
 FROM (
     SELECT player_id, MIN(value) AS best_value
     FROM bids
-    WHERE round_id = :round_id AND value >= 2
+    WHERE round_id = :round_id1 AND value >= 2
     GROUP BY player_id
 ) AS bp
-JOIN bids b ON b.round_id = :round_id
+JOIN bids b ON b.round_id = :round_id2
            AND b.player_id = bp.player_id
            AND b.value = bp.best_value
 LEFT JOIN players p ON p.room_id = :room_id AND p.id = bp.player_id
@@ -543,8 +545,9 @@ SQL;
 
     $stmt = db()->prepare($sql);
     $stmt->execute([
-        'round_id' => $roundId,
-        'room_id'  => $roomId,
+        'round_id1' => $roundId,
+        'round_id2' => $roundId,
+        'room_id'   => $roomId,
     ]);
 
     $rows = $stmt->fetchAll();

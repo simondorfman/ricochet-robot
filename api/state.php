@@ -16,9 +16,13 @@ $timeoutAt = microtime(true) + 25.0;
 
 while (microtime(true) < $timeoutAt) {
     try {
+        error_log("Fetching round for code: " . $code);
         $round = fetchCurrentRoundByRoomCode($code);
+        error_log("Round fetched: " . ($round ? 'success' : 'null'));
     } catch (Throwable $e) {
-        respondJson(500, ['error' => 'Failed to load round.']);
+        error_log("Error fetching round: " . $e->getMessage());
+        error_log("Stack trace: " . $e->getTraceAsString());
+        respondJson(500, ['error' => 'Failed to load round: ' . $e->getMessage()]);
     }
 
     if ($round === null) {
@@ -26,6 +30,8 @@ while (microtime(true) < $timeoutAt) {
     }
 
     $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    
+    error_log("Round status: " . $round['status'] . ", bidding_ends_at: " . ($round['bidding_ends_at'] ?? 'null'));
 
     if (!empty($round['bidding_ends_at']) && $round['status'] === 'countdown') {
         try {
@@ -46,11 +52,15 @@ while (microtime(true) < $timeoutAt) {
                         $lockedEnds = null;
                     }
 
+                    error_log("Timer check: now=" . $now->format('Y-m-d H:i:s') . ", lockedEnds=" . ($lockedEnds ? $lockedEnds->format('Y-m-d H:i:s') : 'null') . ", expired=" . ($lockedEnds !== null && $now >= $lockedEnds ? 'YES' : 'NO'));
+                    
                     if ($lockedEnds !== null && $now >= $lockedEnds) {
                         $queueForStorage = [];
                         try {
                             $bestBids = fetchBestBidsPerPlayer((int) $locked['id'], (int) $locked['room_id']);
+                            error_log("Best bids fetched: " . json_encode($bestBids));
                             $orderedQueue = buildVerificationQueue($bestBids);
+                            error_log("Ordered queue: " . json_encode($orderedQueue));
                             foreach ($orderedQueue as $entry) {
                                 if (!isset($entry['playerId'], $entry['value'])) {
                                     continue;
@@ -62,6 +72,8 @@ while (microtime(true) < $timeoutAt) {
                                 ];
                             }
                         } catch (Throwable $e) {
+                            error_log("Exception building verification queue: " . $e->getMessage());
+                            error_log("Stack trace: " . $e->getTraceAsString());
                             $queueForStorage = [];
                         }
 
@@ -97,6 +109,8 @@ while (microtime(true) < $timeoutAt) {
     $currentVersion = isset($round['state_version']) ? (int) $round['state_version'] : 0;
 
     if ($currentVersion !== $since) {
+        try {
+        error_log("Processing state for room: " . $code . ", version: " . $currentVersion);
         $remaining = null;
         if (!empty($round['bidding_ends_at'])) {
             try {
@@ -191,6 +205,8 @@ while (microtime(true) < $timeoutAt) {
 
         if (!empty($round['verifying_queue_json'])) {
             $decodedQueue = json_decode((string) $round['verifying_queue_json'], true);
+            error_log("Verification queue JSON: " . $round['verifying_queue_json']);
+            error_log("Decoded queue: " . json_encode($decodedQueue));
             if (json_last_error() === JSON_ERROR_NONE && is_array($decodedQueue)) {
                 foreach ($decodedQueue as $entry) {
                     if (!is_array($entry) || !array_key_exists('playerId', $entry)) {
@@ -392,6 +408,8 @@ while (microtime(true) < $timeoutAt) {
                 'queue'        => $queueForState,
                 'currentIndex' => $currentIndex,
             ];
+            
+            error_log("Verification payload: " . json_encode($verifyingPayload));
         }
 
         $playersState = [];
@@ -408,6 +426,56 @@ while (microtime(true) < $timeoutAt) {
             $hostPlayerId = (int) $round['host_player_id'];
         }
 
+        // Parse robot positions from database
+        $robotPositions = [];
+        error_log("Available round columns: " . implode(', ', array_keys($round)));
+        if (array_key_exists('robot_positions_json', $round) && !empty($round['robot_positions_json'])) {
+            try {
+                $decoded = json_decode((string) $round['robot_positions_json'], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $robotPositions = $decoded;
+                }
+            } catch (Exception $e) {
+                error_log("Error parsing robot positions: " . $e->getMessage());
+                $robotPositions = [];
+            }
+        }
+
+        // Generate target if not already set for this round
+        $currentTarget = null;
+        if (array_key_exists('current_target_json', $round) && !empty($round['current_target_json'])) {
+            $decoded = json_decode((string) $round['current_target_json'], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $currentTarget = $decoded;
+            }
+        }
+        
+        // If no target exists, generate one and save it
+        if ($currentTarget === null) {
+            try {
+                $currentTarget = generateRandomTarget();
+                $targetJson = json_encode($currentTarget);
+                
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new Exception('Failed to encode target: ' . json_last_error_msg());
+                }
+                
+                error_log("Generated target: " . $targetJson);
+                
+                // Update the round with the new target
+                $pdo = db();
+                $updateTarget = $pdo->prepare("UPDATE rounds SET current_target_json = :target_json WHERE id = :id");
+                $updateTarget->execute([
+                    'target_json' => $targetJson,
+                    'id' => (int) $round['id']
+                ]);
+            } catch (Exception $e) {
+                error_log("Error generating target: " . $e->getMessage());
+                // Don't fail the entire request if target generation fails
+                $currentTarget = null;
+            }
+        }
+
         $payload = [
             'stateVersion' => $currentVersion,
             'status'       => $round['status'],
@@ -419,6 +487,8 @@ while (microtime(true) < $timeoutAt) {
             'players'      => $playersState,
             'hostPlayerId' => $hostPlayerId,
             'serverNow'    => $now->format(DateTimeInterface::ATOM),
+            'robotPositions' => $robotPositions,
+            'currentTarget' => $currentTarget,
         ];
 
         if ($currentLeader !== null) {
@@ -434,6 +504,14 @@ while (microtime(true) < $timeoutAt) {
         }
 
         respondJson(200, $payload);
+        } catch (Throwable $e) {
+            error_log("Error generating state: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Failed to generate state: ' . $e->getMessage()]);
+            exit;
+        }
     }
 
     usleep(200000);
@@ -441,6 +519,97 @@ while (microtime(true) < $timeoutAt) {
 
 http_response_code(204);
 exit;
+
+function generateRandomTarget(): array
+{
+    // Available symbol positions (matching client-side SYMBOL_POSITIONS)
+    $symbolPositions = [
+        // Quadrant 1: Top-Left (Rows 0-7, Cols 0-7)
+        ['row' => 1, 'col' => 1, 'symbol' => 'DI'], // Diamond Indigo
+        ['row' => 2, 'col' => 6, 'symbol' => 'HL'], // Heart Lime
+        ['row' => 4, 'col' => 2, 'symbol' => 'CC'], // Club Cyan
+        ['row' => 5, 'col' => 7, 'symbol' => 'SY'], // Spade Yellow
+        
+        // Quadrant 2: Top-Right (Rows 0-7, Cols 8-15)
+        ['row' => 1, 'col' => 9, 'symbol' => 'DY'], // Diamond Yellow
+        ['row' => 3, 'col' => 11, 'symbol' => 'CI'], // Club Indigo
+        ['row' => 5, 'col' => 14, 'symbol' => 'HC'], // Heart Cyan
+        ['row' => 6, 'col' => 10, 'symbol' => 'SL'], // Spade Lime
+        
+        // Quadrant 3: Bottom-Left (Rows 8-15, Cols 0-7)
+        ['row' => 9, 'col' => 3, 'symbol' => 'CY'], // Club Yellow
+        ['row' => 11, 'col' => 1, 'symbol' => 'HI'], // Heart Indigo
+        ['row' => 12, 'col' => 6, 'symbol' => 'SC'], // Spade Cyan
+        ['row' => 14, 'col' => 2, 'symbol' => 'DL'], // Diamond Lime
+        
+        // Quadrant 4: Bottom-Right (Rows 8-15, Cols 8-15)
+        ['row' => 7, 'col' => 13, 'symbol' => 'QUAD'], // Special 4-color square
+        ['row' => 9, 'col' => 9, 'symbol' => 'DC'], // Diamond Cyan
+        ['row' => 11, 'col' => 15, 'symbol' => 'HY'], // Heart Yellow
+        ['row' => 13, 'col' => 11, 'symbol' => 'SI'], // Spade Indigo
+        ['row' => 15, 'col' => 8, 'symbol' => 'CL']  // Club Lime
+    ];
+    
+    // Select a random symbol position
+    $randomIndex = array_rand($symbolPositions);
+    $selectedSymbol = $symbolPositions[$randomIndex];
+    
+    return [
+        'row' => $selectedSymbol['row'],
+        'col' => $selectedSymbol['col'],
+        'symbol' => $selectedSymbol['symbol']
+    ];
+}
+
+function generateRobotPositions(): array
+{
+    // Robot names in order (matching client-side ROBOT_ORDER)
+    $robotOrder = ['Purple', 'Blue', 'Green', 'Yellow'];
+    
+    // Board size (16x16)
+    $boardSize = 16;
+    
+    // Symbol positions (these would be the same for all games)
+    $symbolPositions = [
+        // Add known symbol positions here - for now using empty array
+        // In a real implementation, these would be the actual symbol positions
+    ];
+    
+    $occupiedPositions = [];
+    foreach ($symbolPositions as $pos) {
+        $occupiedPositions[] = $pos['row'] . ',' . $pos['col'];
+    }
+    
+    $robotPositions = [];
+    
+    foreach ($robotOrder as $robotName) {
+        $position = null;
+        $tries = 0;
+        
+        while ($position === null && $tries < 200) {
+            $row = random_int(0, $boardSize - 1);
+            $col = random_int(0, $boardSize - 1);
+            $key = $row . ',' . $col;
+            
+            // Skip if position is occupied by symbol, other robot, or center area
+            if (!in_array($key, $occupiedPositions) && 
+                !(($row === 7 || $row === 8) && ($col === 7 || $col === 8))) {
+                $position = ['row' => $row, 'col' => $col];
+                $occupiedPositions[] = $key;
+            }
+            $tries++;
+        }
+        
+        // Fallback to default position if random placement fails
+        if ($position === null) {
+            $position = ['row' => 0, 'col' => 0];
+        }
+        
+        $robotPositions[$robotName] = $position;
+    }
+    
+    return $robotPositions;
+}
 
 function respondJson(int $status, array $payload): void
 {

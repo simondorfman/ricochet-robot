@@ -43,10 +43,14 @@ try {
         respondJson(404, ['error' => 'Room not found or no active round. Create one via POST /api/rooms/{code}/create.']);
     }
 
+    error_log("Bid attempt - Round status: " . $round['status'] . ", bidding_ends_at: " . ($round['bidding_ends_at'] ?? 'null'));
+    
     if ($round['status'] === 'bidding' && empty($round['bidding_ends_at'])) {
+        error_log("Starting countdown for round " . $round['id']);
         $endsAt = startCountdown((int) $round['id']);
         $round['status'] = 'countdown';
         $round['bidding_ends_at'] = $endsAt;
+        error_log("Countdown started, ends at: " . $endsAt);
     }
 
     if ($round['status'] !== 'countdown') {

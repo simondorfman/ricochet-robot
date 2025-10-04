@@ -20,7 +20,18 @@
     async function initialSync() {
       const res = await fetch(`/api/rooms/${encodeURIComponent(state.code)}/state?since=-1`);
       if (!res.ok) {
-        throw new Error('Failed to load initial state');
+        let errorMessage = 'Failed to load initial state';
+        try {
+          const errorData = await res.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // If we can't parse the error response, use the status text
+          errorMessage = `Failed to load initial state (${res.status}: ${res.statusText})`;
+        }
+        console.error('State API error:', errorMessage);
+        throw new Error(errorMessage);
       }
       const data = await res.json();
       state.since = data.stateVersion;
@@ -93,7 +104,18 @@
     async function initialSync() {
       const res = await fetch(`/api/rooms/${encodeURIComponent(state.code)}/state?since=-1`);
       if (!res.ok) {
-        throw new Error('Failed to load initial state');
+        let errorMessage = 'Failed to load initial state';
+        try {
+          const errorData = await res.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // If we can't parse the error response, use the status text
+          errorMessage = `Failed to load initial state (${res.status}: ${res.statusText})`;
+        }
+        console.error('State API error:', errorMessage);
+        throw new Error(errorMessage);
       }
       const data = await res.json();
       state.since = data.stateVersion;
