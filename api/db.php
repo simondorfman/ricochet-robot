@@ -700,3 +700,160 @@ function buildVerificationQueue(array $bestBids): array
 
     return array_merge($minEntries, $others);
 }
+
+function checkWinCondition(int $roomId, int $playerId): array
+{
+    // Get player count and winner's token count
+    $playerCount = getPlayerCount($roomId);
+    $winnerTokens = getPlayerTokenCount($roomId, $playerId);
+    
+    // Determine win threshold based on player count
+    $winThreshold = getWinThreshold($playerCount);
+    
+    $gameWon = $winnerTokens >= $winThreshold;
+    $reason = null;
+    
+    if ($gameWon) {
+        $reason = "Player reached {$winThreshold} tokens (has {$winnerTokens})";
+    }
+    
+    return [
+        'gameWon' => $gameWon,
+        'reason' => $reason,
+        'playerCount' => $playerCount,
+        'winThreshold' => $winThreshold,
+        'winnerTokens' => $winnerTokens
+    ];
+}
+
+function getPlayerCount(int $roomId): int
+{
+    $sql = 'SELECT COUNT(*) FROM room_players WHERE room_id = :room_id';
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['room_id' => $roomId]);
+    return (int) $stmt->fetchColumn();
+}
+
+function getPlayerTokenCount(int $roomId, int $playerId): int
+{
+    $sql = 'SELECT tokens_won FROM room_players WHERE room_id = :room_id AND player_id = :player_id';
+    $stmt = db()->prepare($sql);
+    $stmt->execute([
+        'room_id' => $roomId,
+        'player_id' => $playerId
+    ]);
+    $result = $stmt->fetchColumn();
+    return $result !== false ? (int) $result : 0;
+}
+
+function getWinThreshold(int $playerCount): int
+{
+    // Ricochet Robots win conditions:
+    // 2 players: first to 8 chips
+    // 3 players: first to 6 chips  
+    // 4 players: first to 5 chips
+    // >4 players: agree target (default to 5)
+    
+    switch ($playerCount) {
+        case 2:
+            return 8;
+        case 3:
+            return 6;
+        case 4:
+            return 5;
+        default:
+            return 5; // Default for >4 players
+    }
+}
+
+// Target Chip Management Functions
+
+function initializeTargetChips(int $roomId): void
+{
+    // Standard Ricochet Robots target chips - exactly 17 chips (one for each symbol)
+    $targetChips = [
+        // Diamond targets (D) - 4 chips
+        ['symbol' => 'DR', 'row' => 0, 'col' => 0],   // Red Diamond
+        ['symbol' => 'DG', 'row' => 0, 'col' => 7],   // Green Diamond  
+        ['symbol' => 'DB', 'row' => 0, 'col' => 15],  // Blue Diamond
+        ['symbol' => 'DY', 'row' => 7, 'col' => 0],   // Yellow Diamond
+        
+        // Triangle targets (T) - 4 chips
+        ['symbol' => 'TR', 'row' => 1, 'col' => 1],    // Red Triangle
+        ['symbol' => 'TG', 'row' => 1, 'col' => 6],   // Green Triangle
+        ['symbol' => 'TB', 'row' => 1, 'col' => 9],   // Blue Triangle
+        ['symbol' => 'TY', 'row' => 1, 'col' => 14],  // Yellow Triangle
+        
+        // Circle targets (C) - 4 chips
+        ['symbol' => 'CR', 'row' => 2, 'col' => 2],    // Red Circle
+        ['symbol' => 'CG', 'row' => 2, 'col' => 5],    // Green Circle
+        ['symbol' => 'CB', 'row' => 2, 'col' => 10],   // Blue Circle
+        ['symbol' => 'CY', 'row' => 2, 'col' => 13],   // Yellow Circle
+        
+        // Square targets (S) - 4 chips
+        ['symbol' => 'SR', 'row' => 3, 'col' => 3],    // Red Square
+        ['symbol' => 'SG', 'row' => 3, 'col' => 4],    // Green Square
+        ['symbol' => 'SB', 'row' => 3, 'col' => 11],   // Blue Square
+        ['symbol' => 'SY', 'row' => 3, 'col' => 12],   // Yellow Square
+        
+        // Star target (★) - 1 chip
+        ['symbol' => '★', 'row' => 7, 'col' => 7],     // Star (center)
+    ];
+    
+    $sql = 'INSERT INTO target_chips (room_id, symbol, row_pos, col_pos) VALUES (:room_id, :symbol, :row, :col)';
+    $stmt = db()->prepare($sql);
+    
+    foreach ($targetChips as $chip) {
+        $stmt->execute([
+            'room_id' => $roomId,
+            'symbol' => $chip['symbol'],
+            'row' => $chip['row'],
+            'col' => $chip['col']
+        ]);
+    }
+}
+
+function drawTargetChip(int $roomId): ?array
+{
+    // Get an undrawn target chip
+    $sql = 'SELECT id, symbol, row_pos, col_pos FROM target_chips WHERE room_id = :room_id AND is_drawn = FALSE ORDER BY RAND() LIMIT 1';
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['room_id' => $roomId]);
+    $chip = $stmt->fetch();
+    
+    if ($chip === false) {
+        return null; // No more chips available
+    }
+    
+    // Mark chip as drawn
+    $updateSql = 'UPDATE target_chips SET is_drawn = TRUE, drawn_at = UTC_TIMESTAMP() WHERE id = :id';
+    $updateStmt = db()->prepare($updateSql);
+    $updateStmt->execute(['id' => $chip['id']]);
+    
+    return [
+        'id' => (int) $chip['id'],
+        'symbol' => $chip['symbol'],
+        'row' => (int) $chip['row_pos'],
+        'col' => (int) $chip['col_pos']
+    ];
+}
+
+function reshuffleTargetChips(int $roomId): void
+{
+    // Reset all chips to undrawn state
+    $sql = 'UPDATE target_chips SET is_drawn = FALSE, drawn_at = NULL WHERE room_id = :room_id';
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['room_id' => $roomId]);
+}
+
+function getTargetChipStats(int $roomId): array
+{
+    $sql = 'SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN is_drawn = TRUE THEN 1 ELSE 0 END) as drawn,
+        SUM(CASE WHEN is_drawn = FALSE THEN 1 ELSE 0 END) as remaining
+        FROM target_chips WHERE room_id = :room_id';
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['room_id' => $roomId]);
+    return $stmt->fetch();
+}

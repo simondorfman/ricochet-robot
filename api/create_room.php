@@ -41,6 +41,9 @@ try {
     $insertRoom = $pdo->prepare('INSERT INTO rooms (code, created_at) VALUES (:code, UTC_TIMESTAMP())');
     $insertRoom->execute(['code' => $code]);
     $roomId = (int) $pdo->lastInsertId();
+    
+    // Initialize target chips for this room
+    initializeTargetChips($roomId);
 
     // Generate robot positions
     try {

@@ -72,12 +72,21 @@ try {
     $robotPositions = generateRobotPositions();
     $robotPositionsJson = json_encode($robotPositions);
     
+    // Draw a target chip for this round
+    $targetChip = drawTargetChip($roomId);
+    if ($targetChip === null) {
+        // No more chips available, reshuffle and draw again
+        reshuffleTargetChips($roomId);
+        $targetChip = drawTargetChip($roomId);
+    }
+    
     $insert = $pdo->prepare(
-        "INSERT INTO rounds (room_id, status, state_version, robot_positions_json, created_at) VALUES (:room_id, 'bidding', 0, :robot_positions, UTC_TIMESTAMP())"
+        "INSERT INTO rounds (room_id, status, state_version, robot_positions_json, target_chip_id, created_at) VALUES (:room_id, 'bidding', 0, :robot_positions, :target_chip_id, UTC_TIMESTAMP())"
     );
     $insert->execute([
         'room_id' => $roomId,
         'robot_positions' => $robotPositionsJson,
+        'target_chip_id' => $targetChip['id'],
     ]);
 
     $newRoundId = (int) $pdo->lastInsertId();

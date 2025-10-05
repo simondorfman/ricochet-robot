@@ -80,10 +80,22 @@ CREATE TABLE IF NOT EXISTS room_players (
   FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 SQL,
+    <<<'SQL'
+CREATE TABLE IF NOT EXISTS target_chips (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  room_id INT NOT NULL,
+  symbol VARCHAR(10) NOT NULL,
+  row_pos INT NOT NULL,
+  col_pos INT NOT NULL,
+  is_drawn BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL,
 ];
 
 foreach ($statements as $sql) {
     $pdo->exec($sql);
 }
 
-fwrite(STDOUT, "Database schema ensured.\n");
+// Database schema ensured - output handled by run_migration.php

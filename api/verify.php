@@ -58,15 +58,7 @@ try {
         respondJson(409, ['error' => 'Round is not in verifying status.']);
     }
 
-    $hostFromRoom = array_key_exists('host_player_id', $round) && $round['host_player_id'] !== null
-        ? (int) $round['host_player_id']
-        : null;
-
-    if ($hostFromRoom === null || $hostFromRoom !== $hostPlayerId) {
-        $pdo->rollBack();
-        respondJson(403, ['error' => 'Only the host may update verification.']);
-    }
-
+    // Get the current player being verified
     $queueJson = $round['verifying_queue_json'] ?? '[]';
     $decoded = json_decode((string) $queueJson, true);
     $queue = [];
@@ -94,6 +86,13 @@ try {
         $currentEntry = null;
     }
 
+    // Check if the requesting player is the current player being verified
+    $currentPlayerId = $currentEntry ? (int) $currentEntry['playerId'] : null;
+    if ($currentPlayerId === null || $currentPlayerId !== $hostPlayerId) {
+        $pdo->rollBack();
+        respondJson(403, ['error' => 'Only the current player being verified may update verification.']);
+    }
+
     if ($action === 'pass') {
         if ($currentEntry === null || !isset($currentEntry['playerId'])) {
             $pdo->rollBack();
@@ -112,10 +111,20 @@ try {
         ]);
 
         awardTokenToPlayer((int) $round['room_id'], $winnerId);
+        
+        // Check win conditions after awarding token
+        $winCondition = checkWinCondition((int) $round['room_id'], $winnerId);
+        
         bumpVersion((int) $round['id']);
 
         $pdo->commit();
-        respondJson(200, ['ok' => true, 'result' => 'pass', 'winnerPlayerId' => $winnerId]);
+        respondJson(200, [
+            'ok' => true, 
+            'result' => 'pass', 
+            'winnerPlayerId' => $winnerId,
+            'gameWon' => $winCondition['gameWon'],
+            'winReason' => $winCondition['reason'] ?? null
+        ]);
     }
 
     // action === 'fail'
@@ -128,6 +137,16 @@ try {
 
     if ($queueCount === 0 || $nextIndex >= $queueCount) {
         $finalIndex = $queueCount === 0 ? 0 : $nextIndex;
+        
+        // Check if we need to reshuffle target chips (no one succeeded)
+        $roomId = (int) $round['room_id'];
+        $targetChipStats = getTargetChipStats($roomId);
+        
+        // If no chips remaining, reshuffle for next round
+        if ($targetChipStats['remaining'] <= 0) {
+            reshuffleTargetChips($roomId);
+        }
+        
         $update = $pdo->prepare(
             "UPDATE rounds SET status = 'complete', verifying_current_index = :current_index, winner_player_id = NULL, ended_at = UTC_TIMESTAMP() WHERE id = :id"
         );

@@ -22,6 +22,24 @@
       border-radius: 0.375rem;
       text-align: center;
     }
+    .start-game-container {
+      margin-bottom: 0.75rem;
+      text-align: center;
+      padding: 1rem;
+      background: #f0f9ff;
+      border: 2px solid #0ea5e9;
+      border-radius: 0.5rem;
+    }
+    .start-game-container button {
+      font-size: 1.2rem;
+      padding: 0.75rem 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .start-game-message {
+      font-size: 0.9rem;
+      color: #0369a1;
+      font-weight: 500;
+    }
     .timer { font-size: 2rem; font-weight: bold; }
     ul { padding-left: 1.5rem; }
     .columns { display: flex; flex-wrap: wrap; gap: 1.5rem; }
@@ -601,6 +619,10 @@
           <div class="puzzle-progress">
             Puzzle <span id="current-puzzle">1</span> of <span id="total-puzzles">17</span>
           </div>
+          <div id="start-game-container" class="start-game-container" hidden>
+            <button type="button" id="start-game-button" class="primary">Start Game</button>
+            <div class="start-game-message">Click "Start Game" to begin the first puzzle!</div>
+          </div>
           <div class="timer-container">
             <div class="timer-label">Time Remaining</div>
             <div class="timer-display" id="timer-display" aria-live="polite" aria-label="Time remaining">—</div>
@@ -776,6 +798,8 @@
 
       const statusEl = document.getElementById('status');
       const versionEl = document.getElementById('state-version');
+      const startGameContainer = document.getElementById('start-game-container');
+      const startGameButton = document.getElementById('start-game-button');
       // remainingEl removed - using timerDisplayEl instead
       const timerDisplayEl = document.getElementById('timer-display');
       const timerProgressEl = document.getElementById('timer-progress');
@@ -1547,6 +1571,14 @@
         statusEl.textContent = state.status;
         versionEl.textContent = state.stateVersion;
         
+        // Show/hide start game button
+        if (startGameContainer) {
+          const shouldShowStartGame = state.status === 'bidding' && 
+                                    (!state.currentTarget || !state.currentTarget.symbol) &&
+                                    (!state.robotPositions || Object.keys(state.robotPositions).length === 0);
+          startGameContainer.hidden = !shouldShowStartGame;
+        }
+        
         // Load robot positions from server state
         console.log('State robotPositions:', state.robotPositions);
         if (state.robotPositions && typeof state.robotPositions === 'object') {
@@ -2277,6 +2309,25 @@
         });
       }
 
+      if (startGameButton) {
+        startGameButton.addEventListener('click', function () {
+          if (!currentRoomCode || !currentPlayerId) {
+            showToast('Join a room first.', true);
+            return;
+          }
+          // Start the game by calling next round (which will generate the first target)
+          window.PollingHelpers.startNextRound(currentRoomCode, currentPlayerId).then(function () {
+            showToast('Game started!', false);
+            startGameContainer.hidden = true;
+            resetGameForNextRound();
+          }).catch(function (err) {
+            console.error(err);
+            const message = err && err.message ? err.message : 'Unable to start game.';
+            showToast(message, true);
+          });
+        });
+      }
+
       function showToast(message, isError) {
         if (!toastEl) {
           return;
@@ -2851,7 +2902,11 @@
           } else {
             reason = `used ${demonstrationMoves} moves (bid: ${playerBid})`;
           }
-          showToast(`❌ ${formatPlayerLabel(playerId)} failed: ${reason}. Moving on to next bid.`, true);
+          showToast(`❌ ${formatPlayerLabel(playerId)} failed: ${reason}. Resetting robots and moving to next bid.`, true);
+          
+          // Reset robots to their starting positions for this round
+          resetRobotsToRoundStart();
+          
           // Call server API to mark this attempt as failed and advance to next player
           callVerificationAPI(false);
         }
@@ -2874,11 +2929,22 @@
         }
       }
 
-      function endGame() {
-        showToast('Game Over! All 17 puzzles have been solved!', false);
+      function endGame(winnerPlayerId = null, winReason = null) {
+        if (winnerPlayerId && winReason) {
+          showToast(`🏆 GAME OVER! ${formatPlayerLabel(winnerPlayerId)} wins! ${winReason}`, false);
+        } else {
+          showToast('Game Over! All 17 puzzles have been solved!', false);
+        }
+        
         // TODO: Show final scores and winner
         gameMode = 'complete';
         updateGameModeUI();
+        
+        // Disable all game controls
+        const nextRoundButton = document.getElementById('next-round');
+        if (nextRoundButton) {
+          nextRoundButton.disabled = true;
+        }
       }
 
       function advanceVerificationQueue() {
@@ -3145,7 +3211,12 @@
           console.log(`Verification ${action} successful:`, data);
           
           if (action === 'pass') {
-            showToast(`🎉 Verification successful! Moving to next puzzle.`, false);
+            if (data.gameWon) {
+              showToast(`🏆 GAME OVER! ${formatPlayerLabel(data.winnerPlayerId)} wins! ${data.winReason}`, false);
+              endGame(data.winnerPlayerId, data.winReason);
+            } else {
+              showToast(`🎉 Verification successful! Moving to next puzzle.`, false);
+            }
           } else {
             // Check if this was the last player in the queue
             if (data.queueExhausted || data.currentIndex >= data.queueLength) {
@@ -3172,6 +3243,29 @@
         
         // TODO: Call server API to advance verification queue
         // This would trigger the next player's demo mode
+      }
+
+      function resetRobotsToRoundStart() {
+        // Reset robots to their starting positions for this round
+        // This is called when a player fails their demonstration
+        if (lastStateSnapshot && lastStateSnapshot.robotPositions) {
+          console.log('Resetting robots to round start positions:', lastStateSnapshot.robotPositions);
+          
+          // Update robot positions from server state
+          for (const [robotName, position] of Object.entries(lastStateSnapshot.robotPositions)) {
+            if (position && typeof position === 'object' && 
+                typeof position.row === 'number' && typeof position.col === 'number') {
+              robotState[robotName] = { row: position.row, col: position.col };
+              console.log(`Reset ${robotName} to position:`, position);
+            }
+          }
+          
+          renderRobots();
+          updateSelectedRobotStyles();
+          showToast('Robots reset to starting positions', false);
+        } else {
+          console.warn('No server state available for robot reset');
+        }
       }
 
       function resetGameForNextRound() {

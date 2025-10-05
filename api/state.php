@@ -441,16 +441,31 @@ while (microtime(true) < $timeoutAt) {
             }
         }
 
-        // Generate target if not already set for this round
+        // Get target from target chip system
         $currentTarget = null;
-        if (array_key_exists('current_target_json', $round) && !empty($round['current_target_json'])) {
+        if (!empty($round['target_chip_id'])) {
+            // Get target chip information
+            $targetChipSql = 'SELECT symbol, row_pos, col_pos FROM target_chips WHERE id = :id';
+            $targetChipStmt = db()->prepare($targetChipSql);
+            $targetChipStmt->execute(['id' => $round['target_chip_id']]);
+            $targetChip = $targetChipStmt->fetch();
+            
+            if ($targetChip !== false) {
+                $currentTarget = [
+                    'symbol' => $targetChip['symbol'],
+                    'row' => (int) $targetChip['row_pos'],
+                    'col' => (int) $targetChip['col_pos']
+                ];
+            }
+        } elseif (array_key_exists('current_target_json', $round) && !empty($round['current_target_json'])) {
+            // Fallback to old JSON format for existing rounds
             $decoded = json_decode((string) $round['current_target_json'], true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $currentTarget = $decoded;
             }
         }
         
-        // If no target exists, generate one and save it
+        // If no target exists, generate one and save it (fallback for old rounds)
         if ($currentTarget === null) {
             try {
                 $currentTarget = generateRandomTarget();
@@ -460,7 +475,7 @@ while (microtime(true) < $timeoutAt) {
                     throw new Exception('Failed to encode target: ' . json_last_error_msg());
                 }
                 
-                error_log("Generated target: " . $targetJson);
+                error_log("Generated fallback target: " . $targetJson);
                 
                 // Update the round with the new target
                 $pdo = db();
@@ -470,7 +485,7 @@ while (microtime(true) < $timeoutAt) {
                     'id' => (int) $round['id']
                 ]);
             } catch (Exception $e) {
-                error_log("Error generating target: " . $e->getMessage());
+                error_log("Error generating fallback target: " . $e->getMessage());
                 // Don't fail the entire request if target generation fails
                 $currentTarget = null;
             }
