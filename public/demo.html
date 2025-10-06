@@ -844,18 +844,18 @@
       let nextInFlight = false;
       let claimInFlight = false;
       const BOARD_SIZE = 16;
-      const ROBOT_ORDER = ['Purple', 'Blue', 'Green', 'Yellow'];
+      const ROBOT_ORDER = ['Purple', 'Cyan', 'Lime', 'Yellow'];
       const ROBOT_META = {
         Purple: { id: 'purple', robotClass: 'robot-purple', badgeClass: 'robot-badge-purple', shortLabel: 'P', color: '#482878' },
-        Blue: { id: 'cyan', robotClass: 'robot-cyan', badgeClass: 'robot-badge-cyan', shortLabel: 'C', color: '#26828e' },
-        Green: { id: 'lime', robotClass: 'robot-lime', badgeClass: 'robot-badge-lime', shortLabel: 'L', color: '#90d743' },
+        Cyan: { id: 'cyan', robotClass: 'robot-cyan', badgeClass: 'robot-badge-cyan', shortLabel: 'C', color: '#26828e' },
+        Lime: { id: 'lime', robotClass: 'robot-lime', badgeClass: 'robot-badge-lime', shortLabel: 'L', color: '#90d743' },
         Yellow: { id: 'yellow', robotClass: 'robot-yellow', badgeClass: 'robot-badge-yellow', shortLabel: 'Y', color: '#fde725' }
       };
 
       const INITIAL_ROBOT_POSITIONS = {
         Purple: { row: 1, col: 1 },
-        Blue: { row: 1, col: 14 },
-        Green: { row: 14, col: 1 },
+        Cyan: { row: 1, col: 14 },
+        Lime: { row: 14, col: 1 },
         Yellow: { row: 14, col: 14 }
       };
       // Static wall data system
@@ -2891,8 +2891,7 @@
           // Success! Award point and move to next puzzle
           showToast(`🎉 ${formatPlayerLabel(playerId)} solved it in ${demonstrationMoves} moves! (bid: ${playerBid}) - You get the point!`, false);
           awardChipToPlayer(playerId);
-          callVerificationAPI(true); // Mark as successful
-          advanceToNextPuzzle();
+          callVerificationAPI(true); // Mark as successful - advanceToNextPuzzle will be called in the success callback
         } else {
           // Failed - either didn't reach target or used too many moves
           let reason;
@@ -2925,6 +2924,14 @@
           // Start new round with new puzzle
           resetGameForNextRound();
           showToast(`Puzzle ${currentPuzzleNumber} of ${totalPuzzles}`, false);
+          
+          // Call next_round API to create a new round
+          window.PollingHelpers.startNextRound(currentRoomCode, currentPlayerId).then(function () {
+            showToast('New puzzle started!', false);
+          }).catch(function (error) {
+            console.error('Failed to start next round:', error);
+            showToast('Failed to start next puzzle. Please try again.', true);
+          });
         }
       }
 
@@ -3198,7 +3205,10 @@
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ playerId: currentPlayerId })
+          body: JSON.stringify({ 
+            playerId: currentPlayerId,
+            robotPositions: robotState
+          })
         })
         .then(response => {
           if (!response.ok) {
@@ -3215,6 +3225,7 @@
               endGame(data.winnerPlayerId, data.winReason);
             } else {
               showToast(`🎉 Verification successful! Moving to next puzzle.`, false);
+              advanceToNextPuzzle();
             }
           } else {
             // Check if this was the last player in the queue
@@ -3440,7 +3451,8 @@
           "D": "♦", // Diamond
           "H": "♥", // Heart
           "C": "♣", // Club
-          "S": "♠"  // Spade
+          "S": "♠", // Spade
+          "★": "★"  // Star
         };
 
         const colorMap = {
@@ -3514,10 +3526,10 @@
         }
         
         const symbolMap = {
-          "D": "♦", "T": "▲", "C": "●", "S": "■"
+          "D": "♦", "H": "♥", "C": "♣", "S": "♠", "★": "★"
         };
         const colorMap = {
-          "R": "#ff0000", "G": "#00ff00", "B": "#0000ff", "Y": "#ffff00"
+          "I": "#482878", "L": "#90d743", "C": "#26828e", "Y": "#fde725"
         };
         
         if (currentTarget.symbol === 'QUAD') {
@@ -3535,10 +3547,12 @@
         } else if (currentTarget.symbol && currentTarget.symbol.length >= 2) {
           const shape = currentTarget.symbol[0];
           const color = currentTarget.symbol[1];
+          const robotName = getRobotNameForColor(color);
+          const symbolName = getSymbolName(shape);
           targetDisplay.innerHTML = `
             <div class="target-single">
               <span class="target-symbol" style="color: ${colorMap[color]}">${symbolMap[shape]}</span>
-              <div class="target-label">${getRobotNameForColor(color)} Robot</div>
+              <div class="target-label">${robotName} Robot must reach this ${symbolName}</div>
             </div>
           `;
         } else {
@@ -3549,9 +3563,20 @@
 
       function getRobotNameForColor(colorCode) {
         const colorMap = {
-          "R": "Red", "G": "Green", "B": "Blue", "Y": "Yellow"
+          "I": "Purple", "L": "Lime", "C": "Cyan", "Y": "Yellow"
         };
         return colorMap[colorCode] || "Unknown";
+      }
+      
+      function getSymbolName(symbol) {
+        const symbolMap = {
+          'D': 'Diamond',
+          'H': 'Heart', 
+          'C': 'Club',
+          'S': 'Spade',
+          '★': 'Star'
+        };
+        return symbolMap[symbol] || 'Unknown';
       }
 
       function getRobotNameForTarget(target) {

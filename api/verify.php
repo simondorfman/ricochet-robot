@@ -101,12 +101,19 @@ try {
 
         $winnerId = (int) $currentEntry['playerId'];
 
+        // Get robot positions from the request payload
+        $robotPositionsJson = null;
+        if (array_key_exists('robotPositions', $payload) && is_array($payload['robotPositions'])) {
+            $robotPositionsJson = json_encode($payload['robotPositions']);
+        }
+
         $update = $pdo->prepare(
-            "UPDATE rounds SET status = 'complete', winner_player_id = :winner_id, verifying_current_index = :current_index, ended_at = UTC_TIMESTAMP() WHERE id = :id"
+            "UPDATE rounds SET status = 'complete', winner_player_id = :winner_id, verifying_current_index = :current_index, ended_at = UTC_TIMESTAMP(), robot_positions_json = :robot_positions WHERE id = :id"
         );
         $update->execute([
             'winner_id'     => $winnerId,
             'current_index' => $currentIndex,
+            'robot_positions' => $robotPositionsJson,
             'id'            => (int) $round['id'],
         ]);
 

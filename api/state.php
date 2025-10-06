@@ -555,7 +555,7 @@ function generateRandomTarget(): array
 function generateRobotPositions(): array
 {
     // Robot names in order (matching client-side ROBOT_ORDER)
-    $robotOrder = ['Purple', 'Blue', 'Green', 'Yellow'];
+    $robotOrder = ['Purple', 'Cyan', 'Lime', 'Yellow'];
     
     // Board size (16x16)
     $boardSize = 16;

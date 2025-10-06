@@ -82,26 +82,49 @@ try {
         }
     }
 
-    // Generate robot positions for the new round
-    error_log("Generating robot positions...");
-    $robotPositions = generateRobotPositions();
+    // Get current robot positions from the previous round (preserve robot positions)
+    error_log("Getting current robot positions from previous round...");
+    $currentRobotPositions = null;
+    if (array_key_exists('robot_positions_json', $round) && !empty($round['robot_positions_json'])) {
+        $currentRobotPositions = json_decode((string) $round['robot_positions_json'], true);
+        error_log("Current robot positions found: " . json_encode($currentRobotPositions));
+    }
+    
+    // If no current positions, generate new ones (should only happen for first round)
+    if ($currentRobotPositions === null) {
+        error_log("No current robot positions, generating new ones...");
+        $robotPositions = generateRobotPositions();
+    } else {
+        error_log("Preserving current robot positions...");
+        $robotPositions = $currentRobotPositions;
+    }
+    
     $robotPositionsJson = json_encode($robotPositions);
-    error_log("Robot positions generated: " . $robotPositionsJson);
+    error_log("Robot positions for new round: " . $robotPositionsJson);
     
     // Draw a target chip for this round
     error_log("Drawing target chip for room: $roomId");
     $targetChip = drawTargetChip($roomId);
     if ($targetChip === null) {
-        error_log("No target chips available, initializing for room: $roomId");
-        // No chips available - initialize them for this room
-        initializeTargetChips($roomId);
-        $targetChip = drawTargetChip($roomId);
+        error_log("No target chips available, checking if we need to reshuffle...");
+        // Check if all chips are drawn - if so, reshuffle them
+        $stats = getTargetChipStats($roomId);
+        if ($stats['total'] > 0 && $stats['remaining'] == 0) {
+            error_log("All chips drawn, reshuffling for room: $roomId");
+            reshuffleTargetChips($roomId);
+            $targetChip = drawTargetChip($roomId);
+        } else {
+            error_log("No target chips available, initializing for room: $roomId");
+            // No chips available - initialize them for this room
+            initializeTargetChips($roomId);
+            $targetChip = drawTargetChip($roomId);
+        }
         
-        // If still no chips after initialization, something is wrong
+        // If still no chips after initialization/reshuffle, something is wrong
         if ($targetChip === null) {
-            error_log("Failed to initialize target chips for room: $roomId");
+            error_log("Failed to get target chip for room: $roomId");
             $pdo->rollBack();
-            respondJson(500, ['error' => 'Unable to initialize target chips for this room.']);
+            respondJson(500, ['error' => 'Unable to get target chip for this room.']);
         }
     }
     error_log("Target chip drawn: " . json_encode($targetChip));

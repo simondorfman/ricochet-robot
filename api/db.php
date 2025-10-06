@@ -771,33 +771,32 @@ function getWinThreshold(int $playerCount): int
 function initializeTargetChips(int $roomId): void
 {
     // Standard Ricochet Robots target chips - exactly 17 chips (one for each symbol)
+    // Positions match the frontend SYMBOL_POSITIONS
     $targetChips = [
-        // Diamond targets (D) - 4 chips
-        ['symbol' => 'DR', 'row' => 0, 'col' => 0],   // Red Diamond
-        ['symbol' => 'DG', 'row' => 0, 'col' => 7],   // Green Diamond  
-        ['symbol' => 'DB', 'row' => 0, 'col' => 15],  // Blue Diamond
-        ['symbol' => 'DY', 'row' => 7, 'col' => 0],   // Yellow Diamond
+        // Quadrant 1: Top-Left (Rows 0-7, Cols 0-7)
+        ['symbol' => 'DI', 'row' => 1, 'col' => 1],   // Diamond Indigo
+        ['symbol' => 'HL', 'row' => 2, 'col' => 6],   // Heart Lime
+        ['symbol' => 'CC', 'row' => 4, 'col' => 2],   // Club Cyan
+        ['symbol' => 'SY', 'row' => 5, 'col' => 7],   // Spade Yellow
         
-        // Triangle targets (T) - 4 chips
-        ['symbol' => 'TR', 'row' => 1, 'col' => 1],    // Red Triangle
-        ['symbol' => 'TG', 'row' => 1, 'col' => 6],   // Green Triangle
-        ['symbol' => 'TB', 'row' => 1, 'col' => 9],   // Blue Triangle
-        ['symbol' => 'TY', 'row' => 1, 'col' => 14],  // Yellow Triangle
+        // Quadrant 2: Top-Right (Rows 0-7, Cols 8-15)
+        ['symbol' => 'DY', 'row' => 1, 'col' => 9],   // Diamond Yellow
+        ['symbol' => 'CI', 'row' => 3, 'col' => 11],  // Club Indigo
+        ['symbol' => 'HC', 'row' => 5, 'col' => 14],  // Heart Cyan
+        ['symbol' => 'SL', 'row' => 6, 'col' => 10],  // Spade Lime
         
-        // Circle targets (C) - 4 chips
-        ['symbol' => 'CR', 'row' => 2, 'col' => 2],    // Red Circle
-        ['symbol' => 'CG', 'row' => 2, 'col' => 5],    // Green Circle
-        ['symbol' => 'CB', 'row' => 2, 'col' => 10],   // Blue Circle
-        ['symbol' => 'CY', 'row' => 2, 'col' => 13],   // Yellow Circle
+        // Quadrant 3: Bottom-Left (Rows 8-15, Cols 0-7)
+        ['symbol' => 'CY', 'row' => 9, 'col' => 3],   // Club Yellow
+        ['symbol' => 'HI', 'row' => 11, 'col' => 1],  // Heart Indigo
+        ['symbol' => 'SC', 'row' => 12, 'col' => 6],  // Spade Cyan
+        ['symbol' => 'DL', 'row' => 14, 'col' => 2],  // Diamond Lime
         
-        // Square targets (S) - 4 chips
-        ['symbol' => 'SR', 'row' => 3, 'col' => 3],    // Red Square
-        ['symbol' => 'SG', 'row' => 3, 'col' => 4],    // Green Square
-        ['symbol' => 'SB', 'row' => 3, 'col' => 11],   // Blue Square
-        ['symbol' => 'SY', 'row' => 3, 'col' => 12],   // Yellow Square
-        
-        // Star target (★) - 1 chip
-        ['symbol' => '★', 'row' => 7, 'col' => 7],     // Star (center)
+        // Quadrant 4: Bottom-Right (Rows 8-15, Cols 8-15)
+        ['symbol' => 'QUAD', 'row' => 7, 'col' => 13], // Special 4-color square
+        ['symbol' => 'CL', 'row' => 10, 'col' => 11],  // Club Lime
+        ['symbol' => 'SI', 'row' => 11, 'col' => 13],  // Spade Indigo
+        ['symbol' => 'DC', 'row' => 12, 'col' => 10],  // Diamond Cyan
+        ['symbol' => 'HY', 'row' => 13, 'col' => 12],  // Heart Yellow
     ];
     
     $sql = 'INSERT INTO target_chips (room_id, symbol, row_pos, col_pos) VALUES (:room_id, :symbol, :row, :col)';
