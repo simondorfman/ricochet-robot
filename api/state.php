@@ -465,31 +465,7 @@ while (microtime(true) < $timeoutAt) {
             }
         }
         
-        // If no target exists, generate one and save it (fallback for old rounds)
-        if ($currentTarget === null) {
-            try {
-                $currentTarget = generateRandomTarget();
-                $targetJson = json_encode($currentTarget);
-                
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new Exception('Failed to encode target: ' . json_last_error_msg());
-                }
-                
-                error_log("Generated fallback target: " . $targetJson);
-                
-                // Update the round with the new target
-                $pdo = db();
-                $updateTarget = $pdo->prepare("UPDATE rounds SET current_target_json = :target_json WHERE id = :id");
-                $updateTarget->execute([
-                    'target_json' => $targetJson,
-                    'id' => (int) $round['id']
-                ]);
-            } catch (Exception $e) {
-                error_log("Error generating fallback target: " . $e->getMessage());
-                // Don't fail the entire request if target generation fails
-                $currentTarget = null;
-            }
-        }
+        // No automatic target generation - targets are only created when "Start Game" is clicked
 
         $payload = [
             'stateVersion' => $currentVersion,

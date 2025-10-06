@@ -1574,8 +1574,7 @@
         // Show/hide start game button
         if (startGameContainer) {
           const shouldShowStartGame = state.status === 'bidding' && 
-                                    (!state.currentTarget || !state.currentTarget.symbol) &&
-                                    (!state.robotPositions || Object.keys(state.robotPositions).length === 0);
+                                    (!state.currentTarget || !state.currentTarget.symbol);
           startGameContainer.hidden = !shouldShowStartGame;
         }
         
@@ -3515,10 +3514,10 @@
         }
         
         const symbolMap = {
-          "D": "♦", "H": "♥", "C": "♣", "S": "♠"
+          "D": "♦", "T": "▲", "C": "●", "S": "■"
         };
         const colorMap = {
-          "I": "#482878", "L": "#90d743", "Y": "#fde725", "C": "#26828e"
+          "R": "#ff0000", "G": "#00ff00", "B": "#0000ff", "Y": "#ffff00"
         };
         
         if (currentTarget.symbol === 'QUAD') {
@@ -3550,7 +3549,7 @@
 
       function getRobotNameForColor(colorCode) {
         const colorMap = {
-          "I": "Purple", "L": "Green", "Y": "Yellow", "C": "Blue"
+          "R": "Red", "G": "Green", "B": "Blue", "Y": "Yellow"
         };
         return colorMap[colorCode] || "Unknown";
       }

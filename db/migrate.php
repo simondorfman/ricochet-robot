@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS target_chips (
   row_pos INT NOT NULL,
   col_pos INT NOT NULL,
   is_drawn BOOLEAN NOT NULL DEFAULT FALSE,
+  drawn_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -96,6 +97,27 @@ SQL,
 
 foreach ($statements as $sql) {
     $pdo->exec($sql);
+}
+
+// Add missing columns to existing tables
+$alterStatements = [
+    // Add robot_positions_json to rounds table if it doesn't exist
+    "ALTER TABLE rounds ADD COLUMN robot_positions_json JSON NULL",
+    // Add target_chip_id to rounds table if it doesn't exist
+    "ALTER TABLE rounds ADD COLUMN target_chip_id INT NULL",
+    // Add drawn_at to target_chips table if it doesn't exist  
+    "ALTER TABLE target_chips ADD COLUMN drawn_at TIMESTAMP NULL",
+];
+
+foreach ($alterStatements as $sql) {
+    try {
+        $pdo->exec($sql);
+    } catch (PDOException $e) {
+        // Ignore "Duplicate column name" errors - column already exists
+        if (strpos($e->getMessage(), 'Duplicate column name') === false) {
+            throw $e;
+        }
+    }
 }
 
 // Database schema ensured - output handled by run_migration.php
