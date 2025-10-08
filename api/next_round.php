@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-error_log("DEBUG: next_round.php file loaded at " . date('Y-m-d H:i:s'));
+// Removed excessive logging for performance
 
 require __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/robot_positions.php';
@@ -41,7 +41,7 @@ if ($playerId <= 0) {
 $pdo = db();
 
 try {
-    error_log("Starting next_round.php for room: $code, player: $playerId");
+    // Removed excessive logging for performance
     $pdo->beginTransaction();
 
     $round = lockRoundForUpdateByRoomCode($code);
@@ -66,9 +66,11 @@ try {
     $hasTarget = !empty($round['target_chip_id']) || 
                  (array_key_exists('current_target_json', $round) && !empty($round['current_target_json']));
     
-    if (!$hasTarget && $status === 'bidding') {
+    if (!$hasTarget) {
         // This is a "Start Game" request - any player can start the game
         // No additional permission checks needed
+        // Allow starting game regardless of current status
+        // We'll UPDATE the existing round instead of creating a new one
     } else {
         // This is a regular "Next Round" request - only host can advance
         if ($hostPlayerId !== $playerId) {
@@ -83,38 +85,29 @@ try {
     }
 
     // Get current robot positions from the previous round (preserve robot positions)
-    error_log("Getting current robot positions from previous round...");
     $currentRobotPositions = null;
     if (array_key_exists('robot_positions_json', $round) && !empty($round['robot_positions_json'])) {
         $currentRobotPositions = json_decode((string) $round['robot_positions_json'], true);
-        error_log("Current robot positions found: " . json_encode($currentRobotPositions));
     }
     
     // If no current positions, generate new ones (should only happen for first round)
     if ($currentRobotPositions === null) {
-        error_log("No current robot positions, generating new ones...");
         $robotPositions = generateRobotPositions();
     } else {
-        error_log("Preserving current robot positions...");
         $robotPositions = $currentRobotPositions;
     }
     
     $robotPositionsJson = json_encode($robotPositions);
-    error_log("Robot positions for new round: " . $robotPositionsJson);
     
     // Draw a target chip for this round
-    error_log("Drawing target chip for room: $roomId");
     $targetChip = drawTargetChip($roomId);
     if ($targetChip === null) {
-        error_log("No target chips available, checking if we need to reshuffle...");
         // Check if all chips are drawn - if so, reshuffle them
         $stats = getTargetChipStats($roomId);
         if ($stats['total'] > 0 && $stats['remaining'] == 0) {
-            error_log("All chips drawn, reshuffling for room: $roomId");
             reshuffleTargetChips($roomId);
             $targetChip = drawTargetChip($roomId);
         } else {
-            error_log("No target chips available, initializing for room: $roomId");
             // No chips available - initialize them for this room
             initializeTargetChips($roomId);
             $targetChip = drawTargetChip($roomId);
@@ -122,33 +115,36 @@ try {
         
         // If still no chips after initialization/reshuffle, something is wrong
         if ($targetChip === null) {
-            error_log("Failed to get target chip for room: $roomId");
             $pdo->rollBack();
             respondJson(500, ['error' => 'Unable to get target chip for this room.']);
         }
     }
-    error_log("Target chip drawn: " . json_encode($targetChip));
     
-    error_log("Inserting new round into database...");
-    $insert = $pdo->prepare(
-        "INSERT INTO rounds (room_id, status, state_version, robot_positions_json, target_chip_id, created_at) VALUES (:room_id, 'bidding', 0, :robot_positions, :target_chip_id, UTC_TIMESTAMP())"
-    );
-    
-    try {
+    if (!$hasTarget) {
+        // This is a "Start Game" request - UPDATE the existing round
+        $update = $pdo->prepare(
+            "UPDATE rounds SET status = 'bidding', state_version = 0, robot_positions_json = :robot_positions, target_chip_id = :target_chip_id WHERE id = :round_id"
+        );
+        
+        $update->execute([
+            'robot_positions' => $robotPositionsJson,
+            'target_chip_id' => $targetChip['id'],
+            'round_id' => $round['id'],
+        ]);
+        $newRoundId = (int) $round['id'];
+    } else {
+        // This is a "Next Round" request - INSERT a new round
+        $insert = $pdo->prepare(
+            "INSERT INTO rounds (room_id, status, state_version, robot_positions_json, target_chip_id, created_at) VALUES (:room_id, 'bidding', 0, :robot_positions, :target_chip_id, UTC_TIMESTAMP())"
+        );
+        
         $insert->execute([
             'room_id' => $roomId,
             'robot_positions' => $robotPositionsJson,
             'target_chip_id' => $targetChip['id'],
         ]);
-        error_log("New round inserted successfully");
-    } catch (PDOException $e) {
-        error_log("Database insert failed: " . $e->getMessage());
-        error_log("SQL error code: " . $e->getCode());
-        error_log("SQL state: " . $e->errorInfo[0]);
-        throw $e;
+        $newRoundId = (int) $pdo->lastInsertId();
     }
-
-    $newRoundId = (int) $pdo->lastInsertId();
 
     $pdo->commit();
 } catch (Throwable $e) {

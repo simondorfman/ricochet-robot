@@ -54,9 +54,9 @@ try {
             throw new Exception('Failed to encode robot positions: ' . json_last_error_msg());
         }
         
-        error_log("Generated robot positions: " . $robotPositionsJson);
+        // Robot positions generated
     } catch (Exception $e) {
-        error_log("Error generating robot positions: " . $e->getMessage());
+        // Error generating robot positions
         $robotPositionsJson = null;
     }
     

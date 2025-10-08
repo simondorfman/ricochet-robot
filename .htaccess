@@ -10,6 +10,9 @@ RewriteRule ^api/rooms/([^/]+)/bid$   api/bid.php?code=$1   [QSA,L]
 # /api/rooms/{code}/verify/{pass|fail} -> /api/verify.php?code={code}&action={pass|fail}
 RewriteRule ^api/rooms/([^/]+)/verify/(pass|fail)$ api/verify.php?code=$1&action=$2 [QSA,L]
 
+# /api/rooms/{code}/demonstration/{start|update|stop} -> /api/demonstration.php?code={code}&action={start|update|stop}
+RewriteRule ^api/rooms/([^/]+)/demonstration/(start|update|stop)$ api/demonstration.php?code=$1&action=$2 [QSA,L]
+
 # /api/rooms/{code}/players/join -> api/players_join.php?code={code}
 RewriteRule ^api/rooms/([^/]+)/players/join$ api/players_join.php?code=$1 [QSA,L]
 

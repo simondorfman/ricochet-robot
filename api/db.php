@@ -316,6 +316,25 @@ SQL;
     return $round !== false ? $round : null;
 }
 
+function getRoundNumberForRoom(string $code): int
+{
+    $sql = <<<SQL
+SELECT COUNT(*) as round_count
+FROM rooms rm
+JOIN rounds r ON r.room_id = rm.id
+WHERE rm.code = :code
+SQL;
+    $stmt = db()->prepare($sql);
+    $stmt->execute(['code' => $code]);
+    $result = $stmt->fetch();
+    
+    $count = $result !== false ? (int) $result['round_count'] : 0;
+    
+    // Return the count as-is (1 for first round, 2 for second, etc.)
+    // The client will display this as "Puzzle X of 17"
+    return $count;
+}
+
 function lockRoundForUpdateByRoomCode(string $code): ?array
 {
     $sql = <<<SQL
@@ -349,7 +368,7 @@ function startCountdown(int $roundId, int $seconds = 60): string
     $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
     $endsAt = $now->modify(sprintf('+%d seconds', $seconds));
     
-    error_log("startCountdown: now=" . $now->format('Y-m-d H:i:s') . ", endsAt=" . $endsAt->format('Y-m-d H:i:s'));
+    // Countdown started
 
     $sql = <<<SQL
 UPDATE rounds
@@ -799,41 +818,50 @@ function initializeTargetChips(int $roomId): void
         ['symbol' => 'HY', 'row' => 13, 'col' => 12],  // Heart Yellow
     ];
     
-    $sql = 'INSERT INTO target_chips (room_id, symbol, row_pos, col_pos) VALUES (:room_id, :symbol, :row, :col)';
-    $stmt = db()->prepare($sql);
+    // Use bulk insert for much better performance
+    $values = [];
+    $placeholders = [];
+    $params = [];
     
-    foreach ($targetChips as $chip) {
-        $stmt->execute([
-            'room_id' => $roomId,
-            'symbol' => $chip['symbol'],
-            'row' => $chip['row'],
-            'col' => $chip['col']
-        ]);
+    foreach ($targetChips as $index => $chip) {
+        $placeholders[] = "(:room_id, :symbol_$index, :row_$index, :col_$index)";
+        $params["symbol_$index"] = $chip['symbol'];
+        $params["row_$index"] = $chip['row'];
+        $params["col_$index"] = $chip['col'];
     }
+    
+    $params['room_id'] = $roomId;
+    $sql = 'INSERT INTO target_chips (room_id, symbol, row_pos, col_pos) VALUES ' . implode(', ', $placeholders);
+    $stmt = db()->prepare($sql);
+    $stmt->execute($params);
 }
 
 function drawTargetChip(int $roomId): ?array
 {
-    // Get an undrawn target chip
-    $sql = 'SELECT id, symbol, row_pos, col_pos FROM target_chips WHERE room_id = :room_id AND is_drawn = FALSE ORDER BY RAND() LIMIT 1';
+    // Use a more efficient approach: get all undrawn chips and pick one randomly in PHP
+    // This avoids the expensive ORDER BY RAND() in MySQL
+    $sql = 'SELECT id, symbol, row_pos, col_pos FROM target_chips WHERE room_id = :room_id AND is_drawn = FALSE';
     $stmt = db()->prepare($sql);
     $stmt->execute(['room_id' => $roomId]);
-    $chip = $stmt->fetch();
+    $chips = $stmt->fetchAll();
     
-    if ($chip === false) {
+    if (empty($chips)) {
         return null; // No more chips available
     }
+    
+    // Pick a random chip from the results
+    $randomChip = $chips[array_rand($chips)];
     
     // Mark chip as drawn
     $updateSql = 'UPDATE target_chips SET is_drawn = TRUE, drawn_at = UTC_TIMESTAMP() WHERE id = :id';
     $updateStmt = db()->prepare($updateSql);
-    $updateStmt->execute(['id' => $chip['id']]);
+    $updateStmt->execute(['id' => $randomChip['id']]);
     
     return [
-        'id' => (int) $chip['id'],
-        'symbol' => $chip['symbol'],
-        'row' => (int) $chip['row_pos'],
-        'col' => (int) $chip['col_pos']
+        'id' => (int) $randomChip['id'],
+        'symbol' => $randomChip['symbol'],
+        'row' => (int) $randomChip['row_pos'],
+        'col' => (int) $randomChip['col_pos']
     ];
 }
 

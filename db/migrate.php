@@ -107,6 +107,10 @@ $alterStatements = [
     "ALTER TABLE rounds ADD COLUMN target_chip_id INT NULL",
     // Add drawn_at to target_chips table if it doesn't exist  
     "ALTER TABLE target_chips ADD COLUMN drawn_at TIMESTAMP NULL",
+    // Add demonstration moves tracking to rounds table
+    "ALTER TABLE rounds ADD COLUMN demonstration_moves_json JSON NULL COMMENT 'Stores the sequence of moves for the current demonstration'",
+    "ALTER TABLE rounds ADD COLUMN demonstration_current_move_index INT NOT NULL DEFAULT 0 COMMENT 'Current move index being demonstrated'",
+    "ALTER TABLE rounds ADD COLUMN demonstration_player_id INT NULL COMMENT 'Player ID of the current demonstrator'",
 ];
 
 foreach ($alterStatements as $sql) {

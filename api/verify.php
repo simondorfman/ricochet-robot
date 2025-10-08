@@ -107,13 +107,21 @@ try {
             $robotPositionsJson = json_encode($payload['robotPositions']);
         }
 
+        // Get demonstration moves from the request payload
+        $demonstrationMovesJson = null;
+        if (array_key_exists('demonstrationMoves', $payload) && is_array($payload['demonstrationMoves'])) {
+            $demonstrationMovesJson = json_encode($payload['demonstrationMoves']);
+        }
+
         $update = $pdo->prepare(
-            "UPDATE rounds SET status = 'complete', winner_player_id = :winner_id, verifying_current_index = :current_index, ended_at = UTC_TIMESTAMP(), robot_positions_json = :robot_positions WHERE id = :id"
+            "UPDATE rounds SET status = 'complete', winner_player_id = :winner_id, verifying_current_index = :current_index, ended_at = UTC_TIMESTAMP(), robot_positions_json = :robot_positions, demonstration_moves_json = :demonstration_moves, demonstration_player_id = :demonstration_player_id WHERE id = :id"
         );
         $update->execute([
             'winner_id'     => $winnerId,
             'current_index' => $currentIndex,
             'robot_positions' => $robotPositionsJson,
+            'demonstration_moves' => $demonstrationMovesJson,
+            'demonstration_player_id' => $winnerId,
             'id'            => (int) $round['id'],
         ]);
 
@@ -162,11 +170,18 @@ try {
             'id'            => (int) $round['id'],
         ]);
     } else {
+        // Reset robots to their original positions for the next player
+        $originalRobotPositions = null;
+        if (array_key_exists('robot_positions_json', $round) && !empty($round['robot_positions_json'])) {
+            $originalRobotPositions = $round['robot_positions_json'];
+        }
+        
         $update = $pdo->prepare(
-            'UPDATE rounds SET verifying_current_index = :current_index WHERE id = :id'
+            'UPDATE rounds SET verifying_current_index = :current_index, robot_positions_json = :robot_positions WHERE id = :id'
         );
         $update->execute([
             'current_index' => $nextIndex,
+            'robot_positions' => $originalRobotPositions,
             'id'            => (int) $round['id'],
         ]);
     }

@@ -16,9 +16,9 @@ $timeoutAt = microtime(true) + 25.0;
 
 while (microtime(true) < $timeoutAt) {
     try {
-        error_log("Fetching round for code: " . $code);
+        // Removed excessive logging for performance
         $round = fetchCurrentRoundByRoomCode($code);
-        error_log("Round fetched: " . ($round ? 'success' : 'null'));
+        // Removed excessive logging for performance
     } catch (Throwable $e) {
         error_log("Error fetching round: " . $e->getMessage());
         error_log("Stack trace: " . $e->getTraceAsString());
@@ -31,7 +31,7 @@ while (microtime(true) < $timeoutAt) {
 
     $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
     
-    error_log("Round status: " . $round['status'] . ", bidding_ends_at: " . ($round['bidding_ends_at'] ?? 'null'));
+    // Removed excessive logging for performance
 
     if (!empty($round['bidding_ends_at']) && $round['status'] === 'countdown') {
         try {
@@ -52,15 +52,13 @@ while (microtime(true) < $timeoutAt) {
                         $lockedEnds = null;
                     }
 
-                    error_log("Timer check: now=" . $now->format('Y-m-d H:i:s') . ", lockedEnds=" . ($lockedEnds ? $lockedEnds->format('Y-m-d H:i:s') : 'null') . ", expired=" . ($lockedEnds !== null && $now >= $lockedEnds ? 'YES' : 'NO'));
+                    // Removed excessive logging for performance
                     
                     if ($lockedEnds !== null && $now >= $lockedEnds) {
                         $queueForStorage = [];
                         try {
                             $bestBids = fetchBestBidsPerPlayer((int) $locked['id'], (int) $locked['room_id']);
-                            error_log("Best bids fetched: " . json_encode($bestBids));
                             $orderedQueue = buildVerificationQueue($bestBids);
-                            error_log("Ordered queue: " . json_encode($orderedQueue));
                             foreach ($orderedQueue as $entry) {
                                 if (!isset($entry['playerId'], $entry['value'])) {
                                     continue;
@@ -110,7 +108,7 @@ while (microtime(true) < $timeoutAt) {
 
     if ($currentVersion !== $since) {
         try {
-        error_log("Processing state for room: " . $code . ", version: " . $currentVersion);
+        // Processing state for room: $code, version: $currentVersion
         $remaining = null;
         if (!empty($round['bidding_ends_at'])) {
             try {
@@ -205,8 +203,7 @@ while (microtime(true) < $timeoutAt) {
 
         if (!empty($round['verifying_queue_json'])) {
             $decodedQueue = json_decode((string) $round['verifying_queue_json'], true);
-            error_log("Verification queue JSON: " . $round['verifying_queue_json']);
-            error_log("Decoded queue: " . json_encode($decodedQueue));
+            // Verification queue processing
             if (json_last_error() === JSON_ERROR_NONE && is_array($decodedQueue)) {
                 foreach ($decodedQueue as $entry) {
                     if (!is_array($entry) || !array_key_exists('playerId', $entry)) {
@@ -409,7 +406,7 @@ while (microtime(true) < $timeoutAt) {
                 'currentIndex' => $currentIndex,
             ];
             
-            error_log("Verification payload: " . json_encode($verifyingPayload));
+            // Verification payload prepared
         }
 
         $playersState = [];
@@ -428,7 +425,7 @@ while (microtime(true) < $timeoutAt) {
 
         // Parse robot positions from database
         $robotPositions = [];
-        error_log("Available round columns: " . implode(', ', array_keys($round)));
+        // Processing round columns
         if (array_key_exists('robot_positions_json', $round) && !empty($round['robot_positions_json'])) {
             try {
                 $decoded = json_decode((string) $round['robot_positions_json'], true);
@@ -467,6 +464,29 @@ while (microtime(true) < $timeoutAt) {
         
         // No automatic target generation - targets are only created when "Start Game" is clicked
 
+        // Get demonstration moves data
+        $demonstrationMoves = null;
+        $demonstrationCurrentMoveIndex = 0;
+        $demonstrationPlayerId = null;
+        
+        if (!empty($round['demonstration_moves_json'])) {
+            $decodedMoves = json_decode((string) $round['demonstration_moves_json'], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedMoves)) {
+                $demonstrationMoves = $decodedMoves;
+            }
+        }
+        
+        if (isset($round['demonstration_current_move_index'])) {
+            $demonstrationCurrentMoveIndex = (int) $round['demonstration_current_move_index'];
+        }
+        
+        if (isset($round['demonstration_player_id'])) {
+            $demonstrationPlayerId = (int) $round['demonstration_player_id'];
+        }
+
+        // Get the current round number for this room
+        $roundNumber = getRoundNumberForRoom($code);
+        
         $payload = [
             'stateVersion' => $currentVersion,
             'status'       => $round['status'],
@@ -480,6 +500,10 @@ while (microtime(true) < $timeoutAt) {
             'serverNow'    => $now->format(DateTimeInterface::ATOM),
             'robotPositions' => $robotPositions,
             'currentTarget' => $currentTarget,
+            'demonstrationMoves' => $demonstrationMoves,
+            'demonstrationCurrentMoveIndex' => $demonstrationCurrentMoveIndex,
+            'demonstrationPlayerId' => $demonstrationPlayerId,
+            'roundNumber' => $roundNumber,
         ];
 
         if ($currentLeader !== null) {

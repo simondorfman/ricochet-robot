@@ -963,6 +963,14 @@
       let demoPlayerId = null; // Player ID of the demonstrator
       let isDemoPlayer = false; // Whether current player is the demonstrator
       
+      // Demonstration synchronization
+      let synchronizedMoves = []; // Moves received from server
+      let synchronizedMoveIndex = 0; // Current synchronized move index
+      let synchronizedPlayerId = null; // Player ID of synchronized demonstrator
+      let isSynchronizedDemonstration = false; // Whether we're in synchronized demo mode
+      let demonstrationAnimationTimer = null; // Timer for synchronized animations
+      let queuedNewMoves = []; // Moves queued while animation is playing
+      
       // Mobile controls
       let touchStartX = 0;
       let touchStartY = 0;
@@ -1582,16 +1590,23 @@
         console.log('State robotPositions:', state.robotPositions);
         if (state.robotPositions && typeof state.robotPositions === 'object') {
           console.log('Loading robot positions from server:', state.robotPositions);
-          // Update robot positions from server
-          for (const [robotName, position] of Object.entries(state.robotPositions)) {
-            if (position && typeof position === 'object' && 
-                typeof position.row === 'number' && typeof position.col === 'number') {
-              robotState[robotName] = { row: position.row, col: position.col };
-              console.log(`Set ${robotName} to position:`, position);
+          
+          // Don't update robot positions during synchronized demonstration
+          // to prevent conflicts with animation
+          if (!isSynchronizedDemonstration) {
+            // Update robot positions from server
+            for (const [robotName, position] of Object.entries(state.robotPositions)) {
+              if (position && typeof position === 'object' && 
+                  typeof position.row === 'number' && typeof position.col === 'number') {
+                robotState[robotName] = { row: position.row, col: position.col };
+                console.log(`Set ${robotName} to position:`, position);
+              }
             }
+            renderRobots();
+            updateSelectedRobotStyles();
+          } else {
+            console.log('Skipping robot position update during synchronized demonstration');
           }
-          renderRobots();
-          updateSelectedRobotStyles();
         } else if (Object.keys(robotState).length === 0) {
           console.log('No server robot positions, initializing locally');
           // Initialize robots only if we have no server data and no local data
@@ -1612,6 +1627,17 @@
           renderTarget();
         } else {
           console.log('No server target, currentTarget is:', currentTarget);
+        }
+        
+        // Handle demonstration synchronization
+        handleDemonstrationSync(state);
+        
+        // Update puzzle number from server
+        if (typeof state.roundNumber === 'number') {
+          // Server returns the actual round count (1 for first round, 2 for second, etc.)
+          // Display this as "Puzzle X of 17"
+          currentPuzzleNumber = state.roundNumber;
+          updatePuzzleProgress();
         }
         
         const playersState = state.players && typeof state.players === 'object' ? state.players : {};
@@ -2314,6 +2340,15 @@
             showToast('Join a room first.', true);
             return;
           }
+          
+          // Prevent multiple rapid clicks
+          if (startGameButton.disabled) {
+            return;
+          }
+          
+          startGameButton.disabled = true;
+          showToast('Starting game...', false);
+          
           // Start the game by calling next round (which will generate the first target)
           window.PollingHelpers.startNextRound(currentRoomCode, currentPlayerId).then(function () {
             showToast('Game started!', false);
@@ -2323,6 +2358,8 @@
             console.error(err);
             const message = err && err.message ? err.message : 'Unable to start game.';
             showToast(message, true);
+            // Re-enable button on error so user can try again
+            startGameButton.disabled = false;
           });
         });
       }
@@ -2742,6 +2779,18 @@
           });
         }
         
+        // Send move to server in real-time during demonstration
+        if (!isDemo && gameMode === 'demonstrating') {
+          const move = {
+            robot: robotName,
+            from: { ...startPos },
+            to: { ...endPos },
+            direction: direction
+          };
+          moveHistory.push(move);
+          sendMoveToServer(move);
+        }
+        
         state.row = endPos.row;
         state.col = endPos.col;
         
@@ -2875,13 +2924,29 @@
       }
 
       function startDemonstration(playerId, playerBid) {
+        // Check if we're already in the same demonstration to prevent restarts
+        if (gameMode === 'demonstrating' && currentPlayerBid === playerBid) {
+          console.log(`Already in demonstration for player ${playerId} with bid ${playerBid} - skipping restart`);
+          return;
+        }
+        
         console.log(`Starting demonstration for player ${playerId} with bid ${playerBid}`);
         gameMode = 'demonstrating';
         demonstrationMoves = 0;
         currentPlayerBid = playerBid;
+        moveHistory = []; // Reset move history for this demonstration
         updateGameModeUI();
         updateMoveCounter();
-        showToast(`🎯 Your turn to demonstrate! You bid ${playerBid} moves. Show your solution!`, false);
+        
+        // Start demonstration synchronization
+        startDemonstrationSync(playerId);
+        
+        // If this is the current player demonstrating, show different message
+        if (currentPlayerId === playerId) {
+          showToast(`🎯 Your turn to demonstrate! You bid ${playerBid} moves. Show your solution!`, false);
+        } else {
+          showToast(`🎬 ${formatPlayerLabel(playerId)} is demonstrating their solution (bid: ${playerBid})...`, false);
+        }
       }
 
       function endDemonstration(success, playerId, playerBid) {
@@ -2900,14 +2965,15 @@
           } else {
             reason = `used ${demonstrationMoves} moves (bid: ${playerBid})`;
           }
-          showToast(`❌ ${formatPlayerLabel(playerId)} failed: ${reason}. Resetting robots and moving to next bid.`, true);
-          
-          // Reset robots to their starting positions for this round
-          resetRobotsToRoundStart();
+          showToast(`❌ ${formatPlayerLabel(playerId)} failed: ${reason}. Moving to next player.`, true);
           
           // Call server API to mark this attempt as failed and advance to next player
+          // Server will reset robots to original positions
           callVerificationAPI(false);
         }
+        
+        // Stop demonstration synchronization
+        stopDemonstrationSync();
         
         gameMode = 'bidding';
         updateGameModeUI();
@@ -3121,6 +3187,287 @@
         updateDemoControls();
       }
 
+      // Demonstration synchronization functions
+      function handleDemonstrationSync(state) {
+        // Check if we have demonstration moves from server
+        if (state.demonstrationMoves && Array.isArray(state.demonstrationMoves) && state.demonstrationMoves.length > 0) {
+          const serverMoveIndex = state.demonstrationCurrentMoveIndex || 0;
+          const serverPlayerId = state.demonstrationPlayerId;
+          
+          // If this is a new demonstration or different player, start synchronized playback
+          if (!isSynchronizedDemonstration || synchronizedPlayerId !== serverPlayerId) {
+            console.log(`Starting new synchronized demonstration: player=${serverPlayerId}, moves=${state.demonstrationMoves.length}, currentPlayer=${synchronizedPlayerId}`);
+            startSynchronizedDemonstration(state.demonstrationMoves, serverPlayerId, serverMoveIndex);
+          } else if (state.demonstrationMoves.length > synchronizedMoves.length) {
+            // New moves have been added - play only the new moves
+            console.log(`Adding new moves: ${state.demonstrationMoves.length - synchronizedMoves.length} new moves`);
+            const newMoves = state.demonstrationMoves.slice(synchronizedMoves.length);
+            synchronizedMoves = [...state.demonstrationMoves];
+            
+            // Only play new moves if we're not already playing moves
+            if (!demonstrationAnimationTimer) {
+              playNewMovesOnly(newMoves);
+            } else {
+              console.log('Moves already being played, queuing new moves for later');
+              queuedNewMoves = [...queuedNewMoves, ...newMoves];
+            }
+          } else if (serverMoveIndex !== synchronizedMoveIndex) {
+            // Update to current move index (for catching up)
+            console.log(`Updating move index: ${synchronizedMoveIndex} -> ${serverMoveIndex}`);
+            updateSynchronizedMoveIndex(serverMoveIndex);
+          } else {
+            // Same demonstration, same player, no new moves - do nothing
+            console.log(`No changes needed for synchronized demonstration: player=${serverPlayerId}, moves=${state.demonstrationMoves.length}, index=${serverMoveIndex}`);
+          }
+        } else if (isSynchronizedDemonstration) {
+          // No more demonstration moves, stop synchronized playback
+          console.log('Stopping synchronized demonstration - no more moves');
+          stopSynchronizedDemonstration();
+        }
+      }
+
+      function startSynchronizedDemonstration(moves, playerId, startIndex = 0) {
+        // Check if we're already in the same synchronized demonstration
+        if (isSynchronizedDemonstration && synchronizedPlayerId === playerId && synchronizedMoves.length === moves.length) {
+          console.log(`Already in synchronized demonstration for player ${playerId} with ${moves.length} moves - skipping restart`);
+          return;
+        }
+        
+        console.log(`Starting synchronized demonstration for player ${playerId} with ${moves.length} moves`);
+        
+        synchronizedMoves = [...moves];
+        synchronizedPlayerId = playerId;
+        synchronizedMoveIndex = startIndex;
+        isSynchronizedDemonstration = true;
+        
+        // Reset robot positions to starting positions
+        resetRobotsToRoundStart();
+        
+        // Start playing moves from the current index
+        playSynchronizedMovesFromIndex(startIndex);
+        
+        // Show notification
+        showToast(`🎬 Watching ${formatPlayerLabel(playerId)}'s solution demonstration...`, false);
+      }
+
+      function updateSynchronizedMoveIndex(newIndex) {
+        if (!isSynchronizedDemonstration) return;
+        
+        synchronizedMoveIndex = newIndex;
+        
+        // If we're behind, catch up by playing moves
+        if (newIndex > synchronizedMoveIndex) {
+          playSynchronizedMovesFromIndex(synchronizedMoveIndex);
+        }
+      }
+
+      function playSynchronizedMovesFromIndex(startIndex) {
+        if (!isSynchronizedDemonstration || startIndex >= synchronizedMoves.length) return;
+        
+        // Clear any existing timer
+        if (demonstrationAnimationTimer) {
+          clearTimeout(demonstrationAnimationTimer);
+          demonstrationAnimationTimer = null;
+        }
+        
+        // Play moves with animation timing
+        let currentIndex = startIndex;
+        
+        function playNextMove() {
+          if (currentIndex >= synchronizedMoves.length || !isSynchronizedDemonstration) {
+            return;
+          }
+          
+          const move = synchronizedMoves[currentIndex];
+          if (move && move.robot && move.direction) {
+            // Execute the move with animation
+            executeSynchronizedMove(move.robot, move.direction, currentIndex);
+            currentIndex++;
+            
+            // Schedule next move with timing (adjustable animation speed)
+            const animationDelay = getAnimationDelay();
+            demonstrationAnimationTimer = setTimeout(playNextMove, animationDelay);
+          }
+        }
+        
+        playNextMove();
+      }
+
+      function playNewMovesOnly(newMoves) {
+        if (!isSynchronizedDemonstration || newMoves.length === 0) return;
+        
+        // Prevent multiple simultaneous playNewMovesOnly calls
+        if (demonstrationAnimationTimer) {
+          console.log('Moves already being played, skipping new moves');
+          return;
+        }
+        
+        // Play only the new moves with animation timing
+        let currentIndex = 0;
+        
+        function playNextNewMove() {
+          if (currentIndex >= newMoves.length || !isSynchronizedDemonstration) {
+            // Check if there are queued moves to play
+            if (queuedNewMoves.length > 0) {
+              console.log(`Playing ${queuedNewMoves.length} queued moves`);
+              const queuedMoves = [...queuedNewMoves];
+              queuedNewMoves = [];
+              playNewMovesOnly(queuedMoves);
+            } else {
+              demonstrationAnimationTimer = null;
+            }
+            return;
+          }
+          
+          const move = newMoves[currentIndex];
+          if (move && move.robot && move.direction) {
+            // Execute the move with animation
+            executeSynchronizedMove(move.robot, move.direction, synchronizedMoves.length - newMoves.length + currentIndex);
+            currentIndex++;
+            
+            // Schedule next move with timing (adjustable animation speed)
+            const animationDelay = getAnimationDelay();
+            demonstrationAnimationTimer = setTimeout(playNextNewMove, animationDelay);
+          } else {
+            // Invalid move, stop playing
+            demonstrationAnimationTimer = null;
+          }
+        }
+        
+        playNextNewMove();
+      }
+
+      function executeSynchronizedMove(robotName, direction, moveIndex) {
+        const state = robotState[robotName];
+        if (!state) return false;
+        
+        const startPos = { row: state.row, col: state.col };
+        const endPos = computeSlide(state.row, state.col, direction, robotName);
+        
+        if (startPos.row === endPos.row && startPos.col === endPos.col) {
+          return false; // No movement possible
+        }
+        
+        // Update robot position
+        state.row = endPos.row;
+        state.col = endPos.col;
+        
+        // Update synchronized move counter
+        synchronizedMoveIndex = moveIndex + 1;
+        
+        // Update move counter display for all players
+        updateSynchronizedMoveCounter(moveIndex + 1);
+        
+        // Render the move
+        renderRobots();
+        updateSelectedRobotStyles();
+        
+        // Check if target was reached
+        if (checkTargetReached(robotName)) {
+          showToast(`🎉 ${formatPlayerLabel(synchronizedPlayerId)} reached the target!`, false);
+        }
+        
+        return true;
+      }
+
+      function updateSynchronizedMoveCounter(moveCount) {
+        const moveCounterEl = document.getElementById('move-counter');
+        if (moveCounterEl) {
+          moveCounterEl.innerHTML = `
+            <div style="font-size: 1.2rem; margin-bottom: 0.25rem;">Moves: ${moveCount}</div>
+            <div style="font-size: 0.9rem; opacity: 0.9;">${formatPlayerLabel(synchronizedPlayerId)}'s solution</div>
+          `;
+        }
+      }
+
+      function stopSynchronizedDemonstration() {
+        console.log('Stopping synchronized demonstration');
+        
+        isSynchronizedDemonstration = false;
+        synchronizedMoves = [];
+        synchronizedMoveIndex = 0;
+        synchronizedPlayerId = null;
+        
+        // Clear any existing timer
+        if (demonstrationAnimationTimer) {
+          clearTimeout(demonstrationAnimationTimer);
+          demonstrationAnimationTimer = null;
+        }
+        
+        // Reset move counter
+        const moveCounterEl = document.getElementById('move-counter');
+        if (moveCounterEl) {
+          moveCounterEl.textContent = '';
+        }
+      }
+
+      // Animation timing controls
+      function getAnimationDelay() {
+        // Base delay of 800ms, could be made configurable
+        return 800;
+      }
+
+      function setAnimationSpeed(speed) {
+        // Speed could be 'slow', 'normal', 'fast'
+        // This could be implemented with user controls
+        console.log(`Animation speed set to: ${speed}`);
+      }
+
+      // Real-time move synchronization
+      function sendMoveToServer(move) {
+        if (!currentRoomCode || !currentPlayerId) return;
+        
+        const url = `/api/rooms/${encodeURIComponent(currentRoomCode)}/demonstration/update`;
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            playerId: currentPlayerId,
+            move: move,
+            moveIndex: moveHistory.length - 1
+          })
+        })
+        .then(response => {
+          if (!response.ok) {
+            console.error('Failed to send move to server:', response.status);
+          }
+        })
+        .catch(error => {
+          console.error('Error sending move to server:', error);
+        });
+      }
+
+      function startDemonstrationSync(playerId) {
+        if (!currentRoomCode || !playerId) return;
+        
+        // Don't call the start API - we'll use update for individual moves
+        // The start API expects demonstrationMoves which we don't have yet
+        console.log(`Starting demonstration sync for player ${playerId} - will use update API for moves`);
+      }
+
+      function stopDemonstrationSync() {
+        if (!currentRoomCode) return;
+        
+        const url = `/api/rooms/${encodeURIComponent(currentRoomCode)}/demonstration/stop`;
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({})
+        })
+        .then(response => {
+          if (!response.ok) {
+            console.error('Failed to stop demonstration sync:', response.status);
+          }
+        })
+        .catch(error => {
+          console.error('Error stopping demonstration sync:', error);
+        });
+      }
+
       // Award and scoreboard functions
       function awardChipToPlayer(playerId) {
         if (!playerId) return;
@@ -3200,15 +3547,24 @@
         
         // Call the verification API
         const url = `/api/rooms/${encodeURIComponent(currentRoomCode)}/verify/${action}`;
+        
+        // Prepare payload with demonstration moves if passing
+        const payload = { 
+          playerId: currentPlayerId,
+          robotPositions: robotState
+        };
+        
+        // Include demonstration moves if this is a successful verification
+        if (success && gameMode === 'demonstrating' && moveHistory.length > 0) {
+          payload.demonstrationMoves = moveHistory;
+        }
+        
         fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
-            playerId: currentPlayerId,
-            robotPositions: robotState
-          })
+          body: JSON.stringify(payload)
         })
         .then(response => {
           if (!response.ok) {
@@ -3225,16 +3581,26 @@
               endGame(data.winnerPlayerId, data.winReason);
             } else {
               showToast(`🎉 Verification successful! Moving to next puzzle.`, false);
-              advanceToNextPuzzle();
+              // Only the host should advance to next puzzle
+              if (currentPlayerId === hostPlayerId) {
+                advanceToNextPuzzle();
+              } else {
+                // Non-host players just wait for the host to advance the round
+                showToast(`Waiting for host to start next puzzle...`, false);
+              }
             }
           } else {
             // Check if this was the last player in the queue
             if (data.queueExhausted || data.currentIndex >= data.queueLength) {
               showToast(`❌ No successful solutions! No one gets the point. Moving to next puzzle.`, true);
-              // Move to next puzzle when queue is exhausted
-              setTimeout(() => {
-                advanceToNextPuzzle();
-              }, 2000);
+              // Only the host should advance to next puzzle
+              if (currentPlayerId === hostPlayerId) {
+                setTimeout(() => {
+                  advanceToNextPuzzle();
+                }, 2000);
+              } else {
+                showToast(`Waiting for host to start next puzzle...`, false);
+              }
             } else {
               showToast(`Verification marked as ${action}. Moving to next player.`, false);
             }
