@@ -12,7 +12,7 @@ if ($code === null || $code === '') {
 }
 
 $since = isset($_GET['since']) ? (int) $_GET['since'] : -1;
-$timeoutAt = microtime(true) + 25.0;
+$timeoutAt = microtime(true) + 10.0;
 
 while (microtime(true) < $timeoutAt) {
     try {
@@ -30,6 +30,14 @@ while (microtime(true) < $timeoutAt) {
     }
 
     $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    
+    // Static cache variables for performance optimization
+    static $leaderboardCache = [];
+    static $leaderboardCacheTime = [];
+    static $playersCache = [];
+    static $playersCacheTime = [];
+    static $roundNumberCache = [];
+    static $roundNumberCacheTime = [];
     
     // Removed excessive logging for performance
 
@@ -137,11 +145,23 @@ while (microtime(true) < $timeoutAt) {
             $bids = [];
         }
 
+        // Cache leaderboard for 5 seconds to reduce database load
+        $cacheKey = (int) $round['room_id'];
+        $nowTimestamp = time();
+        
         $leaderboard = [];
-        try {
-            $leaderboard = fetchLeaderboard((int) $round['room_id']);
-        } catch (Throwable $e) {
-            $leaderboard = [];
+        if (!isset($leaderboardCache[$cacheKey]) || 
+            !isset($leaderboardCacheTime[$cacheKey]) || 
+            ($nowTimestamp - $leaderboardCacheTime[$cacheKey]) > 5) {
+            try {
+                $leaderboard = fetchLeaderboard((int) $round['room_id']);
+                $leaderboardCache[$cacheKey] = $leaderboard;
+                $leaderboardCacheTime[$cacheKey] = $nowTimestamp;
+            } catch (Throwable $e) {
+                $leaderboard = $leaderboardCache[$cacheKey] ?? [];
+            }
+        } else {
+            $leaderboard = $leaderboardCache[$cacheKey];
         }
 
         foreach ($leaderboard as &$entry) {
@@ -154,11 +174,22 @@ while (microtime(true) < $timeoutAt) {
         }
         unset($entry);
 
+        // Cache players data for 3 seconds to reduce database load
+        $playersCacheKey = (int) $round['room_id'];
+        
         $playersById = [];
-        try {
-            $playersById = fetchPlayersForRoom((int) $round['room_id']);
-        } catch (Throwable $e) {
-            $playersById = [];
+        if (!isset($playersCache[$playersCacheKey]) || 
+            !isset($playersCacheTime[$playersCacheKey]) || 
+            ($nowTimestamp - $playersCacheTime[$playersCacheKey]) > 3) {
+            try {
+                $playersById = fetchPlayersForRoom((int) $round['room_id']);
+                $playersCache[$playersCacheKey] = $playersById;
+                $playersCacheTime[$playersCacheKey] = $nowTimestamp;
+            } catch (Throwable $e) {
+                $playersById = $playersCache[$playersCacheKey] ?? [];
+            }
+        } else {
+            $playersById = $playersCache[$playersCacheKey];
         }
 
         $tokensByPlayer = [];
@@ -473,6 +504,7 @@ while (microtime(true) < $timeoutAt) {
             $decodedMoves = json_decode((string) $round['demonstration_moves_json'], true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decodedMoves)) {
                 $demonstrationMoves = $decodedMoves;
+                error_log("DEBUG: Found demonstration moves: " . count($decodedMoves) . " moves, player: " . ($round['demonstration_player_id'] ?? 'null'));
             }
         }
         
@@ -484,8 +516,23 @@ while (microtime(true) < $timeoutAt) {
             $demonstrationPlayerId = (int) $round['demonstration_player_id'];
         }
 
-        // Get the current round number for this room
-        $roundNumber = getRoundNumberForRoom($code);
+        // Get the current round number for this room (cache for 10 seconds)
+        $roundNumberCacheKey = $code;
+        
+        $roundNumber = 1; // Default to 1
+        if (!isset($roundNumberCache[$roundNumberCacheKey]) || 
+            !isset($roundNumberCacheTime[$roundNumberCacheKey]) || 
+            ($nowTimestamp - $roundNumberCacheTime[$roundNumberCacheKey]) > 10) {
+            try {
+                $roundNumber = getRoundNumberForRoom($code);
+                $roundNumberCache[$roundNumberCacheKey] = $roundNumber;
+                $roundNumberCacheTime[$roundNumberCacheKey] = $nowTimestamp;
+            } catch (Throwable $e) {
+                $roundNumber = $roundNumberCache[$roundNumberCacheKey] ?? 1;
+            }
+        } else {
+            $roundNumber = $roundNumberCache[$roundNumberCacheKey];
+        }
         
         $payload = [
             'stateVersion' => $currentVersion,
@@ -529,7 +576,7 @@ while (microtime(true) < $timeoutAt) {
         }
     }
 
-    usleep(200000);
+    usleep(500000);
 }
 
 http_response_code(204);

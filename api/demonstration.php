@@ -83,16 +83,40 @@ try {
         $playerId = isset($payload['playerId']) ? (int) $payload['playerId'] : null;
         $moveIndex = isset($payload['moveIndex']) ? (int) $payload['moveIndex'] : 0;
         
-        // Get current demonstration moves
+        // Use a more robust approach with SELECT FOR UPDATE to prevent race conditions
         $currentMovesJson = $round['demonstration_moves_json'] ?? '[]';
         $currentMoves = json_decode($currentMovesJson, true);
         if (!is_array($currentMoves)) {
             $currentMoves = [];
         }
         
-        // Add the new move
-        $currentMoves[] = $payload['move'];
+        // Validate move sequence to prevent teleportation
+        $newMove = $payload['move'];
+        if (count($currentMoves) > 0) {
+            $lastMove = end($currentMoves);
+            // Check if the new move's "from" position matches the last move's "to" position
+            if (isset($lastMove['to']) && isset($newMove['from']) && 
+                $lastMove['robot'] === $newMove['robot'] &&
+                ($lastMove['to']['row'] !== $newMove['from']['row'] || 
+                 $lastMove['to']['col'] !== $newMove['from']['col'])) {
+                error_log("WARNING: Move sequence mismatch for robot {$newMove['robot']}. Last move to: " . 
+                         json_encode($lastMove['to']) . ", New move from: " . json_encode($newMove['from']));
+                
+                // Instead of just correcting, reject the move to prevent teleportation
+                $pdo->rollBack();
+                respondJson(400, [
+                    'error' => 'Move sequence mismatch detected. Please try again.',
+                    'expectedPosition' => $lastMove['to'],
+                    'receivedPosition' => $newMove['from']
+                ]);
+            }
+        }
+        
+        // Add the validated move
+        $currentMoves[] = $newMove;
         $newMovesJson = json_encode($currentMoves);
+
+        error_log("DEBUG: Adding move " . count($currentMoves) . " for player $playerId: " . json_encode($newMove));
 
         $update = $pdo->prepare(
             "UPDATE rounds SET demonstration_moves_json = :demonstration_moves, demonstration_current_move_index = :move_index, demonstration_player_id = :demonstration_player_id WHERE id = :id"

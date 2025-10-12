@@ -824,13 +824,12 @@ function initializeTargetChips(int $roomId): void
     $params = [];
     
     foreach ($targetChips as $index => $chip) {
-        $placeholders[] = "(:room_id, :symbol_$index, :row_$index, :col_$index)";
+        $placeholders[] = "(:room_id_$index, :symbol_$index, :row_$index, :col_$index)";
+        $params["room_id_$index"] = $roomId;
         $params["symbol_$index"] = $chip['symbol'];
         $params["row_$index"] = $chip['row'];
         $params["col_$index"] = $chip['col'];
     }
-    
-    $params['room_id'] = $roomId;
     $sql = 'INSERT INTO target_chips (room_id, symbol, row_pos, col_pos) VALUES ' . implode(', ', $placeholders);
     $stmt = db()->prepare($sql);
     $stmt->execute($params);

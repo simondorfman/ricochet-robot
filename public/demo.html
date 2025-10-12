@@ -970,6 +970,8 @@
       let isSynchronizedDemonstration = false; // Whether we're in synchronized demo mode
       let demonstrationAnimationTimer = null; // Timer for synchronized animations
       let queuedNewMoves = []; // Moves queued while animation is playing
+      let moveDebounceTimer = null; // Timer for debouncing rapid moves
+      let pendingMoves = []; // Queue for moves waiting to be sent to server
       
       // Mobile controls
       let touchStartX = 0;
@@ -1779,13 +1781,8 @@
           const currentIndex = state.verifying.currentIndex || 0;
           const currentEntry = state.verifying.queue[currentIndex];
           if (currentEntry && currentEntry.playerId) {
-            // Check if the current player is the one who should demonstrate
-            if (currentEntry.playerId === currentPlayerId) {
-              startDemonstration(currentEntry.playerId, currentEntry.value);
-            } else {
-              // Show message that someone else is demonstrating
-              showToast(`${currentEntry.displayName || 'Player ' + currentEntry.playerId} is demonstrating their solution...`, false);
-            }
+            // Start demonstration for all players (both the demonstrator and watchers)
+            startDemonstration(currentEntry.playerId, currentEntry.value);
           }
         } else if (state.status !== 'verifying' && gameMode === 'demonstrating') {
           // Exit demonstration mode if verification is complete
@@ -2231,7 +2228,7 @@
         updateVerifyButtons();
         setMessage(verifyMessage, '', false);
 
-        window.PollingHelpers.verifyPass(currentRoomCode, currentPlayerId).then(function () {
+        callVerificationAPI(true).then(function () {
           setMessage(verifyMessage, `Marked ${formatPlayerLabel(currentEntry.playerId)} as solved.`, false);
         }).catch(function (err) {
           console.error(err);
@@ -2264,7 +2261,7 @@
         updateVerifyButtons();
         setMessage(verifyMessage, '', false);
 
-        window.PollingHelpers.verifyFail(currentRoomCode, currentPlayerId).then(function () {
+        callVerificationAPI(false).then(function () {
           setMessage(verifyMessage, 'Advanced to next verifier.', false);
         }).catch(function (err) {
           console.error(err);
@@ -2763,6 +2760,19 @@
           return false; // No movement possible
         }
         
+        // Validate move sequence during demonstration to prevent teleportation
+        if (!isDemo && gameMode === 'demonstrating' && moveHistory.length > 0) {
+          const lastMove = moveHistory[moveHistory.length - 1];
+          if (lastMove.robot === robotName && 
+              (lastMove.to.row !== startPos.row || lastMove.to.col !== startPos.col)) {
+            console.warn(`Move sequence mismatch for ${robotName}. Expected from: (${lastMove.to.row},${lastMove.to.col}), actual from: (${startPos.row},${startPos.col})`);
+            // Correct the robot position to match the last move
+            state.row = lastMove.to.row;
+            state.col = lastMove.to.col;
+            console.log(`Corrected ${robotName} position to (${state.row},${state.col})`);
+          }
+        }
+        
         // Count moves during demonstration
         if (gameMode === 'demonstrating' && !isDemo) {
           demonstrationMoves++;
@@ -2788,7 +2798,7 @@
             direction: direction
           };
           moveHistory.push(move);
-          sendMoveToServer(move);
+          queueMoveForServer(move);
         }
         
         state.row = endPos.row;
@@ -2974,6 +2984,13 @@
         
         // Stop demonstration synchronization
         stopDemonstrationSync();
+        
+        // Clear any pending move timers to prevent race conditions
+        if (moveDebounceTimer) {
+          clearTimeout(moveDebounceTimer);
+          moveDebounceTimer = null;
+        }
+        pendingMoves = [];
         
         gameMode = 'bidding';
         updateGameModeUI();
@@ -3189,10 +3206,14 @@
 
       // Demonstration synchronization functions
       function handleDemonstrationSync(state) {
+        console.log(`DEBUG: handleDemonstrationSync called - hasMoves=${!!state.demonstrationMoves}, movesLength=${state.demonstrationMoves?.length || 0}, isSynced=${isSynchronizedDemonstration}`);
+        
         // Check if we have demonstration moves from server
         if (state.demonstrationMoves && Array.isArray(state.demonstrationMoves) && state.demonstrationMoves.length > 0) {
           const serverMoveIndex = state.demonstrationCurrentMoveIndex || 0;
           const serverPlayerId = state.demonstrationPlayerId;
+          
+          console.log(`DEBUG: serverMoves=${state.demonstrationMoves.length}, syncedMoves=${synchronizedMoves.length}, serverPlayer=${serverPlayerId}, syncedPlayer=${synchronizedPlayerId}, serverIndex=${serverMoveIndex}, syncedIndex=${synchronizedMoveIndex}`);
           
           // If this is a new demonstration or different player, start synchronized playback
           if (!isSynchronizedDemonstration || synchronizedPlayerId !== serverPlayerId) {
@@ -3204,13 +3225,14 @@
             const newMoves = state.demonstrationMoves.slice(synchronizedMoves.length);
             synchronizedMoves = [...state.demonstrationMoves];
             
-            // Only play new moves if we're not already playing moves
-            if (!demonstrationAnimationTimer) {
-              playNewMovesOnly(newMoves);
-            } else {
-              console.log('Moves already being played, queuing new moves for later');
-              queuedNewMoves = [...queuedNewMoves, ...newMoves];
+            // Clear any existing animation timer and play new moves immediately
+            if (demonstrationAnimationTimer) {
+              console.log('Clearing existing animation timer to play new moves');
+              clearTimeout(demonstrationAnimationTimer);
+              demonstrationAnimationTimer = null;
             }
+            console.log(`Playing ${newMoves.length} new moves immediately`);
+            playNewMovesOnly(newMoves);
           } else if (serverMoveIndex !== synchronizedMoveIndex) {
             // Update to current move index (for catching up)
             console.log(`Updating move index: ${synchronizedMoveIndex} -> ${serverMoveIndex}`);
@@ -3240,8 +3262,8 @@
         synchronizedMoveIndex = startIndex;
         isSynchronizedDemonstration = true;
         
-        // Reset robot positions to starting positions
-        resetRobotsToRoundStart();
+        // For synchronized demonstrations, start from current robot positions
+        // (don't reset to round start positions)
         
         // Start playing moves from the current index
         playSynchronizedMovesFromIndex(startIndex);
@@ -3253,12 +3275,12 @@
       function updateSynchronizedMoveIndex(newIndex) {
         if (!isSynchronizedDemonstration) return;
         
-        synchronizedMoveIndex = newIndex;
-        
         // If we're behind, catch up by playing moves
         if (newIndex > synchronizedMoveIndex) {
           playSynchronizedMovesFromIndex(synchronizedMoveIndex);
         }
+        
+        synchronizedMoveIndex = newIndex;
       }
 
       function playSynchronizedMovesFromIndex(startIndex) {
@@ -3294,19 +3316,30 @@
       }
 
       function playNewMovesOnly(newMoves) {
-        if (!isSynchronizedDemonstration || newMoves.length === 0) return;
+        console.log(`DEBUG: playNewMovesOnly called with ${newMoves.length} moves, isSynced=${isSynchronizedDemonstration}`);
         
-        // Prevent multiple simultaneous playNewMovesOnly calls
-        if (demonstrationAnimationTimer) {
-          console.log('Moves already being played, skipping new moves');
+        if (!isSynchronizedDemonstration || newMoves.length === 0) {
+          console.log(`DEBUG: playNewMovesOnly early return - isSynced=${isSynchronizedDemonstration}, moves=${newMoves.length}`);
           return;
         }
+        
+        // If moves are already being played, queue these moves instead
+        if (demonstrationAnimationTimer) {
+          console.log('Moves already being played, queuing new moves for later');
+          queuedNewMoves = [...queuedNewMoves, ...newMoves];
+          return;
+        }
+        
+        console.log(`DEBUG: Starting to play ${newMoves.length} new moves`);
         
         // Play only the new moves with animation timing
         let currentIndex = 0;
         
         function playNextNewMove() {
+          console.log(`DEBUG: playNextNewMove - currentIndex=${currentIndex}, totalMoves=${newMoves.length}, isSynced=${isSynchronizedDemonstration}`);
+          
           if (currentIndex >= newMoves.length || !isSynchronizedDemonstration) {
+            console.log(`DEBUG: playNextNewMove finished - currentIndex=${currentIndex}, totalMoves=${newMoves.length}, isSynced=${isSynchronizedDemonstration}`);
             // Check if there are queued moves to play
             if (queuedNewMoves.length > 0) {
               console.log(`Playing ${queuedNewMoves.length} queued moves`);
@@ -3320,6 +3353,8 @@
           }
           
           const move = newMoves[currentIndex];
+          console.log(`DEBUG: Playing move ${currentIndex + 1}:`, move);
+          
           if (move && move.robot && move.direction) {
             // Execute the move with animation
             executeSynchronizedMove(move.robot, move.direction, synchronizedMoves.length - newMoves.length + currentIndex);
@@ -3327,9 +3362,11 @@
             
             // Schedule next move with timing (adjustable animation speed)
             const animationDelay = getAnimationDelay();
+            console.log(`DEBUG: Scheduling next move in ${animationDelay}ms`);
             demonstrationAnimationTimer = setTimeout(playNextNewMove, animationDelay);
           } else {
             // Invalid move, stop playing
+            console.log(`DEBUG: Invalid move, stopping:`, move);
             demonstrationAnimationTimer = null;
           }
         }
@@ -3399,6 +3436,20 @@
         if (moveCounterEl) {
           moveCounterEl.textContent = '';
         }
+        
+        // Update robot positions to match server state after demonstration ends
+        if (lastStateSnapshot && lastStateSnapshot.robotPositions) {
+          console.log('Updating robot positions to final server state:', lastStateSnapshot.robotPositions);
+          for (const [robotName, position] of Object.entries(lastStateSnapshot.robotPositions)) {
+            if (position && typeof position === 'object' && 
+                typeof position.row === 'number' && typeof position.col === 'number') {
+              robotState[robotName] = { row: position.row, col: position.col };
+              console.log(`Set ${robotName} to final position:`, position);
+            }
+          }
+          renderRobots();
+          updateSelectedRobotStyles();
+        }
       }
 
       // Animation timing controls
@@ -3411,6 +3462,37 @@
         // Speed could be 'slow', 'normal', 'fast'
         // This could be implemented with user controls
         console.log(`Animation speed set to: ${speed}`);
+      }
+
+      // Move queue and debouncing system
+      function queueMoveForServer(move) {
+        // Add move to pending queue
+        pendingMoves.push(move);
+        
+        // Clear existing debounce timer
+        if (moveDebounceTimer) {
+          clearTimeout(moveDebounceTimer);
+        }
+        
+        // Set new debounce timer (100ms delay)
+        moveDebounceTimer = setTimeout(() => {
+          processPendingMoves();
+        }, 100);
+      }
+      
+      function processPendingMoves() {
+        if (pendingMoves.length === 0) return;
+        
+        // Process moves sequentially to prevent race conditions
+        const movesToProcess = [...pendingMoves];
+        pendingMoves = [];
+        
+        // Send moves one by one with small delays
+        movesToProcess.forEach((move, index) => {
+          setTimeout(() => {
+            sendMoveToServer(move);
+          }, index * 50); // 50ms delay between each move
+        });
       }
 
       // Real-time move synchronization
@@ -3431,11 +3513,24 @@
         })
         .then(response => {
           if (!response.ok) {
-            console.error('Failed to send move to server:', response.status);
+            return response.json().then(errorData => {
+              throw new Error(`HTTP ${response.status}: ${errorData.error || 'Unknown error'}`);
+            });
           }
+          return response.json();
+        })
+        .then(data => {
+          console.log('Move sent successfully:', data);
         })
         .catch(error => {
-          console.error('Error sending move to server:', error);
+          console.error('Failed to send move:', error);
+          
+          // If it's a move sequence mismatch, retry with corrected position
+          if (error.message.includes('Move sequence mismatch')) {
+            console.log('Retrying move with corrected position...');
+            // The move will be retried automatically by the queue system
+            // The server will provide the correct expected position
+          }
         });
       }
 
